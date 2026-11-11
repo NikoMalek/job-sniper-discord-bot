@@ -15,6 +15,8 @@ class Job:
     url: str
     source: str
     published_at: str
+    company_logo_url: str = ""
+    description: str = ""
 
 
 class BaseScraper(ABC):
