@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import random
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -76,11 +77,14 @@ class LinkedInScraper(BaseScraper):
             )
         return jobs
 
-    async def fetch_jobs(self, keywords: list[str], location: str) -> list[Job]:
+    async def fetch_jobs(
+        self, keywords: list[str], location: str, max_age_hours: float = 24.0
+    ) -> list[Job]:
+        age_seconds = math.ceil(max_age_hours * 60 * 60)
         params = {
             "keywords": " OR ".join(keyword.strip() for keyword in keywords if keyword.strip()),
             "location": location,
-            "f_TPR": "r86400",
+            "f_TPR": f"r{age_seconds}",
             "sortBy": "DD",
         }
         headers = {"User-Agent": random.choice(self.user_agents), "Accept-Language": "en-US,en;q=0.9"}
@@ -99,4 +103,3 @@ class LinkedInScraper(BaseScraper):
             LOGGER.exception("LinkedIn returned HTTP %s", response.status_code)
             return []
         return self._parse_jobs(response.text)
-

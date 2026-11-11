@@ -55,7 +55,10 @@ class MonitorCog(commands.Cog):
             return
 
         results = await asyncio.gather(
-            *(scraper.fetch_jobs(config.keywords, config.location) for scraper in self.scrapers),
+            *(
+                scraper.fetch_jobs(config.keywords, config.location, config.max_age_hours)
+                for scraper in self.scrapers
+            ),
             return_exceptions=True,
         )
         jobs: dict[str, Job] = {}

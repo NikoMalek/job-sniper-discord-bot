@@ -28,6 +28,8 @@ Todos los comandos administrativos requieren `Manage Server`:
 
 - `/set-channel`: selecciona el canal de avisos.
 - `/set-location`: define una ciudad, país o ubicación como `Remote`.
+- `/set-max-age`: define cuántas horas hacia atrás buscar, desde 0.0167
+  horas (1 minuto) hasta 168 horas.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
 - `/list-keywords`: muestra la configuración actual.
 - `/status`: muestra latencia, portales y número de avisos enviados.

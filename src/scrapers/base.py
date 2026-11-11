@@ -21,6 +21,7 @@ class BaseScraper(ABC):
     source: str
 
     @abstractmethod
-    async def fetch_jobs(self, keywords: list[str], location: str) -> list[Job]:
+    async def fetch_jobs(
+        self, keywords: list[str], location: str, max_age_hours: float = 24.0
+    ) -> list[Job]:
         """Return recent jobs matching the supplied search."""
-

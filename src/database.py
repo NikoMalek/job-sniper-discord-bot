@@ -15,6 +15,7 @@ class GuildMonitorConfig:
     channel_id: int | None
     location: str
     keywords: list[str]
+    max_age_hours: float
 
 
 class Database:
@@ -33,7 +34,8 @@ class Database:
                 CREATE TABLE IF NOT EXISTS guild_configs (
                     guild_id INTEGER PRIMARY KEY,
                     channel_id INTEGER,
-                    location TEXT NOT NULL DEFAULT 'Worldwide'
+                    location TEXT NOT NULL DEFAULT 'Worldwide',
+                    max_age_hours REAL NOT NULL DEFAULT 24.0
                 );
 
                 CREATE TABLE IF NOT EXISTS guild_keywords (
@@ -56,6 +58,12 @@ class Database:
                 );
                 """
             )
+            columns_cursor = await connection.execute("PRAGMA table_info(guild_configs)")
+            columns = {row[1] for row in await columns_cursor.fetchall()}
+            if "max_age_hours" not in columns:
+                await connection.execute(
+                    "ALTER TABLE guild_configs ADD COLUMN max_age_hours REAL NOT NULL DEFAULT 24.0"
+                )
             await connection.commit()
 
     async def _ensure_guild(self, guild_id: int) -> None:
@@ -84,6 +92,15 @@ class Database:
             )
             await connection.commit()
 
+    async def set_max_age_hours(self, guild_id: int, max_age_hours: float) -> None:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            await connection.execute(
+                "UPDATE guild_configs SET max_age_hours = ? WHERE guild_id = ?",
+                (max_age_hours, guild_id),
+            )
+            await connection.commit()
+
     async def add_keyword(self, guild_id: int, keyword: str) -> bool:
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
@@ -108,7 +125,11 @@ class Database:
         async with aiosqlite.connect(self.path) as connection:
             connection.row_factory = aiosqlite.Row
             config_cursor = await connection.execute(
-                "SELECT guild_id, channel_id, location FROM guild_configs WHERE guild_id = ?",
+                """
+                SELECT guild_id, channel_id, location, max_age_hours
+                FROM guild_configs
+                WHERE guild_id = ?
+                """,
                 (guild_id,),
             )
             config = await config_cursor.fetchone()
@@ -124,6 +145,7 @@ class Database:
             channel_id=config["channel_id"],
             location=config["location"],
             keywords=keywords,
+            max_age_hours=float(config["max_age_hours"]),
         )
 
     async def get_monitor_configs(self) -> list[GuildMonitorConfig]:
@@ -131,7 +153,7 @@ class Database:
             connection.row_factory = aiosqlite.Row
             cursor = await connection.execute(
                 """
-                SELECT guild_id, channel_id, location
+                SELECT guild_id, channel_id, location, max_age_hours
                 FROM guild_configs
                 WHERE channel_id IS NOT NULL
                 ORDER BY guild_id
@@ -152,6 +174,7 @@ class Database:
                             channel_id=config["channel_id"],
                             location=config["location"],
                             keywords=keywords,
+                            max_age_hours=float(config["max_age_hours"]),
                         )
                     )
         return result
