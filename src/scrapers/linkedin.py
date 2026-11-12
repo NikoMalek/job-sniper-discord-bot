@@ -30,18 +30,18 @@ class LinkedInScraper(BaseScraper):
         "(KHTML, like Gecko) Chrome/131.0 Safari/537.36",
     )
 
+    SEARCH_RETRIES = 2
     DETAIL_RETRIES = 2
+    MAX_SEARCH_PAGES = 10
     RETRY_BASE_SECONDS = 3.0
     RETRY_AFTER_CAP = 15.0
     DETAIL_DELAY_RANGE = (0.8, 1.4)
+    SEARCH_PAGE_DELAY_RANGE = (1.0, 2.0)
     DESCRIPTION_CACHE_TTL_SECONDS = 30 * 60
     DESCRIPTION_CACHE_LIMIT = 500
-    DETAIL_COOLDOWN_SECONDS = 4 * 60
 
     def __init__(self) -> None:
         self._description_cache: dict[str, tuple[float, str]] = {}
-        self._rate_limited_jobs: dict[str, float] = {}
-        self._detail_cooldown_until = 0.0
 
     @staticmethod
     def _clean_url(url: str) -> str:
@@ -160,12 +160,13 @@ class LinkedInScraper(BaseScraper):
             description,
         )
 
-    def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
-        retry_after = response.headers.get("Retry-After", "")
-        try:
-            return min(max(float(retry_after), 1.0), self.RETRY_AFTER_CAP)
-        except (TypeError, ValueError):
-            pass
+    def _retry_delay(self, response: httpx.Response | None, attempt: int) -> float:
+        if response is not None:
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                return min(max(float(retry_after), 1.0), self.RETRY_AFTER_CAP)
+            except (TypeError, ValueError):
+                pass
         delay = self.RETRY_BASE_SECONDS * (2**attempt)
         return delay + random.uniform(0.0, 1.5)
 
@@ -174,52 +175,122 @@ class LinkedInScraper(BaseScraper):
         final_url = str(response.url).lower()
         return "authwall" in final_url or "/login" in final_url
 
+    async def _request_with_retry(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        *,
+        params: dict[str, str | int] | None = None,
+        headers: dict[str, str] | None = None,
+        retries: int | None = None,
+        label: str = "request",
+    ) -> httpx.Response | None:
+        """Fetch ``url`` retrying rate limits, server errors and network errors."""
+        attempts = self.SEARCH_RETRIES if retries is None else retries
+        for attempt in range(attempts + 1):
+            try:
+                response = await client.get(url, params=params, headers=headers)
+            except httpx.HTTPError as exc:
+                if attempt >= attempts:
+                    LOGGER.warning(
+                        "LinkedIn %s failed after %d attempts: %s",
+                        label,
+                        attempt + 1,
+                        exc,
+                    )
+                    return None
+                delay = self._retry_delay(None, attempt)
+                LOGGER.warning(
+                    "LinkedIn %s error: %s; retrying in %.1fs (%d/%d)",
+                    label,
+                    exc,
+                    delay,
+                    attempt + 1,
+                    attempts,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            if response.status_code == 429:
+                if attempt >= attempts:
+                    LOGGER.warning(
+                        "LinkedIn %s hit 429 after %d attempts", label, attempt + 1
+                    )
+                    return None
+                delay = self._retry_delay(response, attempt)
+                LOGGER.warning(
+                    "LinkedIn %s hit 429; retrying in %.1fs (%d/%d)",
+                    label,
+                    delay,
+                    attempt + 1,
+                    attempts,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            if response.status_code >= 500:
+                if attempt >= attempts:
+                    LOGGER.warning(
+                        "LinkedIn %s returned %s after %d attempts",
+                        label,
+                        response.status_code,
+                        attempt + 1,
+                    )
+                    return None
+                delay = self._retry_delay(response, attempt)
+                LOGGER.warning(
+                    "LinkedIn %s returned %s; retrying in %.1fs (%d/%d)",
+                    label,
+                    response.status_code,
+                    delay,
+                    attempt + 1,
+                    attempts,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            return response
+
+        return None
+
     async def _fetch_description(
         self,
         client: httpx.AsyncClient,
         job: Job,
         headers: dict[str, str],
-    ) -> tuple[str | None, bool]:
-        """Return ``(description, abort_batch)``.
+    ) -> str | None:
+        """Return the description, or ``None`` if the page could not be read.
 
-        ``description`` is ``None`` when the page could not be read. An empty
-        string means the page loaded but has no parseable description.
-        ``abort_batch`` is ``True`` when LinkedIn is rate limiting us and the
-        remaining jobs should be deferred to the next cycle.
+        An empty string means the page loaded but has no parseable description;
+        those jobs are still returned so they can be notified without a
+        language check.
         """
-        for attempt in range(self.DETAIL_RETRIES + 1):
-            try:
-                response = await client.get(job.url, headers=headers)
-            except httpx.HTTPError:
-                LOGGER.warning("Could not fetch description for LinkedIn job %s", job.id)
-                return None, False
-            if response.status_code == 429:
-                if attempt < self.DETAIL_RETRIES:
-                    delay = self._retry_delay(response, attempt)
-                    LOGGER.warning(
-                        "LinkedIn 429 for job %s; retrying in %.1fs (%d/%d)",
-                        job.id,
-                        delay,
-                        attempt + 1,
-                        self.DETAIL_RETRIES,
-                    )
-                    await asyncio.sleep(delay)
-                    continue
-                LOGGER.warning(
-                    "LinkedIn 429 persists for job %s; deferring remaining jobs",
-                    job.id,
-                )
-                return None, True
-            if not response.is_success:
-                LOGGER.warning(
-                    "LinkedIn returned %s for job %s", response.status_code, job.id
-                )
-                return None, False
-            if self._is_authwall(response):
-                LOGGER.warning("LinkedIn authwall for job %s; deferring", job.id)
-                return None, True
-            return self._parse_description(response.text), False
-        return None, True
+        response = await self._request_with_retry(
+            client,
+            job.url,
+            headers=headers,
+            retries=self.DETAIL_RETRIES,
+            label=f"job {job.id}",
+        )
+        if response is None:
+            LOGGER.warning(
+                "LinkedIn description unavailable for job %s; deferring to next cycle",
+                job.id,
+            )
+            return None
+        if not response.is_success:
+            LOGGER.warning(
+                "LinkedIn returned %s for job %s; deferring to next cycle",
+                response.status_code,
+                job.id,
+            )
+            return None
+        if self._is_authwall(response):
+            LOGGER.warning(
+                "LinkedIn authwall for job %s; deferring to next cycle", job.id
+            )
+            return None
+        return self._parse_description(response.text)
 
     async def fetch_jobs(
         self,
@@ -229,7 +300,7 @@ class LinkedInScraper(BaseScraper):
         known_job_ids: set[str] | None = None,
     ) -> list[Job]:
         age_seconds = math.ceil(max_age_hours * 60 * 60)
-        params = {
+        params: dict[str, str | int] = {
             "keywords": " OR ".join(
                 keyword.strip() for keyword in keywords if keyword.strip()
             ),
@@ -243,25 +314,65 @@ class LinkedInScraper(BaseScraper):
         }
         known = known_job_ids or set()
 
-        now = time.monotonic()
-        if len(self._rate_limited_jobs) > self.DESCRIPTION_CACHE_LIMIT:
-            self._rate_limited_jobs = {
-                job_id: expires_at
-                for job_id, expires_at in self._rate_limited_jobs.items()
-                if expires_at > now
-            }
-
         try:
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(20.0), follow_redirects=True
             ) as client:
-                response = await client.get(self.endpoint, params=params, headers=headers)
-                if response.status_code == 429:
-                    LOGGER.warning("LinkedIn rate limit reached; skipping this cycle")
-                    return []
-                response.raise_for_status()
-                cards = self._parse_jobs(response.text)
+                cards: dict[str, Job] = {}
+                pages_fetched = 0
+                found_count = 0
 
+                for page in range(self.MAX_SEARCH_PAGES):
+                    params["start"] = page * 10
+                    response = await self._request_with_retry(
+                        client,
+                        self.endpoint,
+                        params=params,
+                        headers=headers,
+                        retries=self.SEARCH_RETRIES,
+                        label=f"search page {page + 1}",
+                    )
+                    if response is None:
+                        LOGGER.warning(
+                            "LinkedIn search stopped at page %d; keeping %d jobs "
+                            "from previous pages",
+                            page + 1,
+                            len(cards),
+                        )
+                        break
+                    if self._is_authwall(response):
+                        LOGGER.warning(
+                            "LinkedIn search authwall on page %d; stopping", page + 1
+                        )
+                        break
+                    if not response.is_success:
+                        LOGGER.warning(
+                            "LinkedIn search returned %s on page %d; stopping",
+                            response.status_code,
+                            page + 1,
+                        )
+                        break
+
+                    page_jobs = self._parse_jobs(response.text)
+                    pages_fetched += 1
+                    found_count += len(page_jobs)
+                    if not page_jobs:
+                        break
+
+                    new_jobs = 0
+                    for job in page_jobs:
+                        if job.id not in cards:
+                            cards[job.id] = job
+                            new_jobs += 1
+
+                    if new_jobs == 0:
+                        break
+                    if page + 1 < self.MAX_SEARCH_PAGES:
+                        await asyncio.sleep(
+                            random.uniform(*self.SEARCH_PAGE_DELAY_RANGE)
+                        )
+
+                job_cards = list(cards.values())
                 enriched: list[Job] = []
                 known_count = 0
                 cached_count = 0
@@ -269,7 +380,7 @@ class LinkedInScraper(BaseScraper):
                 without_description = 0
                 deferred_count = 0
 
-                for job in cards:
+                for job in job_cards:
                     if job.id in known:
                         known_count += 1
                         continue
@@ -283,27 +394,11 @@ class LinkedInScraper(BaseScraper):
                             enriched.append(job)
                         continue
 
-                    now = time.monotonic()
-                    if self._rate_limited_jobs.get(job.id, 0.0) > now:
-                        deferred_count += 1
-                        continue
-                    if self._detail_cooldown_until > now:
-                        deferred_count += 1
-                        continue
-
-                    description, abort_batch = await self._fetch_description(
+                    description = await self._fetch_description(
                         client, job, headers
                     )
                     if description is None:
                         deferred_count += 1
-                        self._rate_limited_jobs[job.id] = (
-                            time.monotonic() + self.DETAIL_COOLDOWN_SECONDS
-                        )
-                        if abort_batch:
-                            self._detail_cooldown_until = (
-                                time.monotonic() + self.DETAIL_COOLDOWN_SECONDS
-                            )
-                            break
                         continue
 
                     fetched_count += 1
@@ -319,9 +414,11 @@ class LinkedInScraper(BaseScraper):
             return []
 
         LOGGER.info(
-            "LinkedIn cycle: found=%d known=%d cached=%d fetched=%d "
-            "without_description=%d deferred=%d",
-            len(cards),
+            "LinkedIn cycle: pages=%d found=%d unique=%d known=%d cached=%d "
+            "fetched=%d without_description=%d deferred=%d",
+            pages_fetched,
+            found_count,
+            len(job_cards),
             known_count,
             cached_count,
             fetched_count,
