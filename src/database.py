@@ -15,6 +15,7 @@ class GuildMonitorConfig:
     channel_id: int | None
     location: str
     keywords: list[str]
+    blacklisted_companies: list[str]
     max_age_hours: float
 
 
@@ -43,6 +44,15 @@ class Database:
                     guild_id INTEGER NOT NULL,
                     keyword TEXT NOT NULL,
                     UNIQUE (guild_id, keyword),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS guild_blacklisted_companies (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    company TEXT NOT NULL,
+                    UNIQUE (guild_id, company),
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
@@ -120,6 +130,40 @@ class Database:
             await connection.commit()
             return cursor.rowcount == 1
 
+    async def add_blacklisted_company(self, guild_id: int, company: str) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT 1 FROM guild_blacklisted_companies
+                WHERE guild_id = ? AND lower(company) = lower(?)
+                """,
+                (guild_id, company),
+            )
+            if await cursor.fetchone():
+                return False
+            await connection.execute(
+                """
+                INSERT INTO guild_blacklisted_companies (guild_id, company)
+                VALUES (?, ?)
+                """,
+                (guild_id, company),
+            )
+            await connection.commit()
+        return True
+
+    async def remove_blacklisted_company(self, guild_id: int, company: str) -> bool:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                DELETE FROM guild_blacklisted_companies
+                WHERE guild_id = ? AND lower(company) = lower(?)
+                """,
+                (guild_id, company),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
     async def get_guild_config(self, guild_id: int) -> GuildMonitorConfig:
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
@@ -138,6 +182,16 @@ class Database:
                 (guild_id,),
             )
             keywords = [row["keyword"] for row in await keyword_cursor.fetchall()]
+            blacklist_cursor = await connection.execute(
+                """
+                SELECT company FROM guild_blacklisted_companies
+                WHERE guild_id = ? ORDER BY company
+                """,
+                (guild_id,),
+            )
+            blacklisted_companies = [
+                row["company"] for row in await blacklist_cursor.fetchall()
+            ]
         if config is None:
             raise RuntimeError(f"Guild configuration was not created: {guild_id}")
         return GuildMonitorConfig(
@@ -145,6 +199,7 @@ class Database:
             channel_id=config["channel_id"],
             location=config["location"],
             keywords=keywords,
+            blacklisted_companies=blacklisted_companies,
             max_age_hours=float(config["max_age_hours"]),
         )
 
@@ -167,6 +222,16 @@ class Database:
                     (config["guild_id"],),
                 )
                 keywords = [row["keyword"] for row in await keyword_cursor.fetchall()]
+                blacklist_cursor = await connection.execute(
+                    """
+                    SELECT company FROM guild_blacklisted_companies
+                    WHERE guild_id = ? ORDER BY company
+                    """,
+                    (config["guild_id"],),
+                )
+                blacklisted_companies = [
+                    row["company"] for row in await blacklist_cursor.fetchall()
+                ]
                 if keywords:
                     result.append(
                         GuildMonitorConfig(
@@ -174,6 +239,7 @@ class Database:
                             channel_id=config["channel_id"],
                             location=config["location"],
                             keywords=keywords,
+                            blacklisted_companies=blacklisted_companies,
                             max_age_hours=float(config["max_age_hours"]),
                         )
                     )

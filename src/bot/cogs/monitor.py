@@ -68,6 +68,16 @@ class MonitorCog(commands.Cog):
                 continue
             jobs.update({job.id: job for job in result})
         for job in jobs.values():
+            if any(
+                blocked.casefold() in job.company.casefold()
+                for blocked in config.blacklisted_companies
+            ):
+                LOGGER.info(
+                    "Skipping blacklisted company %s for guild %s",
+                    job.company,
+                    config.guild_id,
+                )
+                continue
             if await self.database.mark_notified(config.guild_id, job.id, job.source):
                 if not await send_job(channel, job):
                     await self._remove_notification(config.guild_id, job.id)

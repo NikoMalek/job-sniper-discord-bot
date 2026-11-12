@@ -84,6 +84,32 @@ class AdminCog(commands.Cog):
         message = "Palabra clave eliminada." if removed else "No encontré esa palabra clave."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @app_commands.command(name="add-blacklist-company", description="Ignora vacantes de una empresa.")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def add_blacklist_company(self, interaction: discord.Interaction, company: str) -> None:
+        try:
+            clean_company = self._clean(company, "La empresa")
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        added = await self.database.add_blacklisted_company(interaction.guild_id or 0, clean_company)
+        message = (
+            f"Las vacantes de **{clean_company}** serán ignoradas."
+            if added
+            else "Esa empresa ya estaba en la blacklist."
+        )
+        await interaction.response.send_message(message, ephemeral=True)
+
+    @app_commands.command(name="remove-blacklist-company", description="Deja de ignorar una empresa.")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def remove_blacklist_company(self, interaction: discord.Interaction, company: str) -> None:
+        clean_company = " ".join(company.split()).strip()
+        removed = await self.database.remove_blacklisted_company(interaction.guild_id or 0, clean_company)
+        message = "Empresa eliminada de la blacklist." if removed else "No encontré esa empresa."
+        await interaction.response.send_message(message, ephemeral=True)
+
     @app_commands.command(name="list-keywords", description="Muestra la configuración del servidor.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -91,10 +117,11 @@ class AdminCog(commands.Cog):
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         channel = f"<#{config.channel_id}>" if config.channel_id else "No configurado"
         keywords = ", ".join(config.keywords) if config.keywords else "Ninguna"
+        blacklist = ", ".join(config.blacklisted_companies) if config.blacklisted_companies else "Ninguna"
         await interaction.response.send_message(
             f"**Canal:** {channel}\n**Ubicación:** {config.location}\n"
             f"**Antigüedad máxima:** {config.max_age_hours:g} horas\n"
-            f"**Palabras clave:** {keywords}",
+            f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}",
             ephemeral=True,
         )
 

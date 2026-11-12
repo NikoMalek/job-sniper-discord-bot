@@ -31,6 +31,9 @@ Todos los comandos administrativos requieren `Manage Server`:
 - `/set-max-age`: define cuántas horas hacia atrás buscar, desde 0.0167
   horas (1 minuto) hasta 168 horas.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
+- `/add-blacklist-company` y `/remove-blacklist-company`: ignora o reactiva
+  empresas específicas, aceptando coincidencias parciales sin distinguir
+  mayúsculas.
 - `/list-keywords`: muestra la configuración actual.
 - `/status`: muestra latencia, portales y número de avisos enviados.
 
