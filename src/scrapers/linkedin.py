@@ -6,6 +6,7 @@ import asyncio
 import logging
 import math
 import random
+import time
 from dataclasses import replace
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -28,6 +29,19 @@ class LinkedInScraper(BaseScraper):
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0 Safari/537.36",
     )
+
+    DETAIL_RETRIES = 2
+    RETRY_BASE_SECONDS = 3.0
+    RETRY_AFTER_CAP = 15.0
+    DETAIL_DELAY_RANGE = (0.8, 1.4)
+    DESCRIPTION_CACHE_TTL_SECONDS = 30 * 60
+    DESCRIPTION_CACHE_LIMIT = 500
+    DETAIL_COOLDOWN_SECONDS = 4 * 60
+
+    def __init__(self) -> None:
+        self._description_cache: dict[str, tuple[float, str]] = {}
+        self._rate_limited_jobs: dict[str, float] = {}
+        self._detail_cooldown_until = 0.0
 
     @staticmethod
     def _clean_url(url: str) -> str:
@@ -119,47 +133,199 @@ class LinkedInScraper(BaseScraper):
         meta = soup.select_one("meta[name='description']")
         return str(meta.get("content", "")).strip() if meta else ""
 
+    def _cached_description(self, job_id: str) -> str | None:
+        entry = self._description_cache.get(job_id)
+        if entry is None:
+            return None
+        expires_at, description = entry
+        if expires_at <= time.monotonic():
+            self._description_cache.pop(job_id, None)
+            return None
+        return description
+
+    def _store_description(self, job_id: str, description: str) -> None:
+        now = time.monotonic()
+        if len(self._description_cache) >= self.DESCRIPTION_CACHE_LIMIT:
+            expired = [
+                key
+                for key, (expires_at, _) in self._description_cache.items()
+                if expires_at <= now
+            ]
+            for key in expired:
+                self._description_cache.pop(key, None)
+            while len(self._description_cache) >= self.DESCRIPTION_CACHE_LIMIT:
+                self._description_cache.pop(next(iter(self._description_cache)))
+        self._description_cache[job_id] = (
+            now + self.DESCRIPTION_CACHE_TTL_SECONDS,
+            description,
+        )
+
+    def _retry_delay(self, response: httpx.Response, attempt: int) -> float:
+        retry_after = response.headers.get("Retry-After", "")
+        try:
+            return min(max(float(retry_after), 1.0), self.RETRY_AFTER_CAP)
+        except (TypeError, ValueError):
+            pass
+        delay = self.RETRY_BASE_SECONDS * (2**attempt)
+        return delay + random.uniform(0.0, 1.5)
+
+    @staticmethod
+    def _is_authwall(response: httpx.Response) -> bool:
+        final_url = str(response.url).lower()
+        return "authwall" in final_url or "/login" in final_url
+
+    async def _fetch_description(
+        self,
+        client: httpx.AsyncClient,
+        job: Job,
+        headers: dict[str, str],
+    ) -> tuple[str | None, bool]:
+        """Return ``(description, abort_batch)``.
+
+        ``description`` is ``None`` when the page could not be read. An empty
+        string means the page loaded but has no parseable description.
+        ``abort_batch`` is ``True`` when LinkedIn is rate limiting us and the
+        remaining jobs should be deferred to the next cycle.
+        """
+        for attempt in range(self.DETAIL_RETRIES + 1):
+            try:
+                response = await client.get(job.url, headers=headers)
+            except httpx.HTTPError:
+                LOGGER.warning("Could not fetch description for LinkedIn job %s", job.id)
+                return None, False
+            if response.status_code == 429:
+                if attempt < self.DETAIL_RETRIES:
+                    delay = self._retry_delay(response, attempt)
+                    LOGGER.warning(
+                        "LinkedIn 429 for job %s; retrying in %.1fs (%d/%d)",
+                        job.id,
+                        delay,
+                        attempt + 1,
+                        self.DETAIL_RETRIES,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                LOGGER.warning(
+                    "LinkedIn 429 persists for job %s; deferring remaining jobs",
+                    job.id,
+                )
+                return None, True
+            if not response.is_success:
+                LOGGER.warning(
+                    "LinkedIn returned %s for job %s", response.status_code, job.id
+                )
+                return None, False
+            if self._is_authwall(response):
+                LOGGER.warning("LinkedIn authwall for job %s; deferring", job.id)
+                return None, True
+            return self._parse_description(response.text), False
+        return None, True
+
     async def fetch_jobs(
-        self, keywords: list[str], location: str, max_age_hours: float = 24.0
+        self,
+        keywords: list[str],
+        location: str,
+        max_age_hours: float = 24.0,
+        known_job_ids: set[str] | None = None,
     ) -> list[Job]:
         age_seconds = math.ceil(max_age_hours * 60 * 60)
         params = {
-            "keywords": " OR ".join(keyword.strip() for keyword in keywords if keyword.strip()),
+            "keywords": " OR ".join(
+                keyword.strip() for keyword in keywords if keyword.strip()
+            ),
             "location": location,
             "f_TPR": f"r{age_seconds}",
             "sortBy": "DD",
         }
-        headers = {"User-Agent": random.choice(self.user_agents), "Accept-Language": "en-US,en;q=0.9"}
+        headers = {
+            "User-Agent": random.choice(self.user_agents),
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        known = known_job_ids or set()
+
+        now = time.monotonic()
+        if len(self._rate_limited_jobs) > self.DESCRIPTION_CACHE_LIMIT:
+            self._rate_limited_jobs = {
+                job_id: expires_at
+                for job_id, expires_at in self._rate_limited_jobs.items()
+                if expires_at > now
+            }
+
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(20.0), follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(20.0), follow_redirects=True
+            ) as client:
                 response = await client.get(self.endpoint, params=params, headers=headers)
                 if response.status_code == 429:
                     LOGGER.warning("LinkedIn rate limit reached; skipping this cycle")
                     return []
                 response.raise_for_status()
-                jobs = self._parse_jobs(response.text)
-                enriched_jobs: list[Job] = []
-                for job in jobs:
-                    if job.description:
-                        enriched_jobs.append(job)
+                cards = self._parse_jobs(response.text)
+
+                enriched: list[Job] = []
+                known_count = 0
+                cached_count = 0
+                fetched_count = 0
+                without_description = 0
+                deferred_count = 0
+
+                for job in cards:
+                    if job.id in known:
+                        known_count += 1
                         continue
-                    try:
-                        detail_response = await client.get(job.url, headers=headers)
-                    except httpx.HTTPError:
-                        LOGGER.warning("Could not fetch description for LinkedIn job %s", job.id)
-                        enriched_jobs.append(job)
+
+                    cached_description = self._cached_description(job.id)
+                    if cached_description is not None:
+                        cached_count += 1
+                        if cached_description:
+                            enriched.append(replace(job, description=cached_description))
+                        else:
+                            enriched.append(job)
                         continue
-                    if detail_response.status_code == 429:
-                        LOGGER.warning("LinkedIn rate limit reached while fetching job details")
-                        enriched_jobs.extend(jobs[len(enriched_jobs):])
-                        break
-                    if detail_response.is_success:
-                        description = self._parse_description(detail_response.text)
-                        enriched_jobs.append(replace(job, description=description))
+
+                    now = time.monotonic()
+                    if self._rate_limited_jobs.get(job.id, 0.0) > now:
+                        deferred_count += 1
+                        continue
+                    if self._detail_cooldown_until > now:
+                        deferred_count += 1
+                        continue
+
+                    description, abort_batch = await self._fetch_description(
+                        client, job, headers
+                    )
+                    if description is None:
+                        deferred_count += 1
+                        self._rate_limited_jobs[job.id] = (
+                            time.monotonic() + self.DETAIL_COOLDOWN_SECONDS
+                        )
+                        if abort_batch:
+                            self._detail_cooldown_until = (
+                                time.monotonic() + self.DETAIL_COOLDOWN_SECONDS
+                            )
+                            break
+                        continue
+
+                    fetched_count += 1
+                    self._store_description(job.id, description)
+                    if description:
+                        enriched.append(replace(job, description=description))
                     else:
-                        enriched_jobs.append(job)
-                    await asyncio.sleep(0.5)
+                        without_description += 1
+                        enriched.append(job)
+                    await asyncio.sleep(random.uniform(*self.DETAIL_DELAY_RANGE))
         except httpx.HTTPError:
             LOGGER.exception("LinkedIn request failed")
             return []
-        return enriched_jobs
+
+        LOGGER.info(
+            "LinkedIn cycle: found=%d known=%d cached=%d fetched=%d "
+            "without_description=%d deferred=%d",
+            len(cards),
+            known_count,
+            cached_count,
+            fetched_count,
+            without_description,
+            deferred_count,
+        )
+        return enriched

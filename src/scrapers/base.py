@@ -24,6 +24,14 @@ class BaseScraper(ABC):
 
     @abstractmethod
     async def fetch_jobs(
-        self, keywords: list[str], location: str, max_age_hours: float = 24.0
+        self,
+        keywords: list[str],
+        location: str,
+        max_age_hours: float = 24.0,
+        known_job_ids: set[str] | None = None,
     ) -> list[Job]:
-        """Return recent jobs matching the supplied search."""
+        """Return recent jobs matching the supplied search.
+
+        ``known_job_ids`` contains jobs already notified for the guild being
+        processed, so scrapers can avoid downloading their details again.
+        """
