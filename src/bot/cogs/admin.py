@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from typing import TYPE_CHECKING
 
-from ...database import Database
+from ...database import MAX_MAX_AGE_HOURS, MIN_MAX_AGE_HOURS, Database
 from ...languages import SUPPORTED_LANGUAGES, parse_languages
 
 if TYPE_CHECKING:
@@ -25,6 +25,15 @@ class AdminCog(commands.Cog):
         if not cleaned:
             raise ValueError(f"{field} no puede estar vacío.")
         return cleaned[:200]
+
+    @staticmethod
+    def _format_age(hours: float) -> str:
+        total_minutes = round(hours * 60)
+        if total_minutes < 60:
+            return f"{total_minutes} minuto{'s' if total_minutes != 1 else ''}"
+        whole_hours, minutes = divmod(total_minutes, 60)
+        label = f"{whole_hours} hora{'s' if whole_hours != 1 else ''}"
+        return f"{label} {minutes} min" if minutes else label
 
     @app_commands.command(name="set-channel", description="Configura el canal de notificaciones.")
     @app_commands.guild_only()
@@ -47,19 +56,26 @@ class AdminCog(commands.Cog):
         await self.database.set_location(interaction.guild_id or 0, clean_location)
         await interaction.response.send_message(f"Ubicación configurada: **{clean_location}**.", ephemeral=True)
 
-    @app_commands.command(name="set-max-age", description="Configura la antigüedad máxima de las vacantes.")
+    @app_commands.command(
+        name="set-max-age",
+        description="Configura la antigüedad máxima en horas (0,5 = 30 minutos).",
+    )
+    @app_commands.describe(
+        hours="Horas hacia atrás. En español usa coma decimal: 0,5 son 30 minutos."
+    )
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
     async def set_max_age(self, interaction: discord.Interaction, hours: float) -> None:
-        if not 1 / 60 <= hours <= 168:
+        if not MIN_MAX_AGE_HOURS <= hours <= MAX_MAX_AGE_HOURS:
             await interaction.response.send_message(
-                "La antigüedad debe estar entre 0.0167 horas (1 minuto) y 168 horas (7 días).",
+                "La antigüedad debe estar entre 10 minutos y 24 horas "
+                "(por ejemplo 0,5 = 30 minutos, 8 = 8 horas).",
                 ephemeral=True,
             )
             return
         await self.database.set_max_age_hours(interaction.guild_id or 0, hours)
         await interaction.response.send_message(
-            f"Buscaré vacantes publicadas en las últimas **{hours:g} horas**.",
+            f"Buscaré vacantes publicadas en los últimos **{self._format_age(hours)}**.",
             ephemeral=True,
         )
 
@@ -197,7 +213,7 @@ class AdminCog(commands.Cog):
         languages = ", ".join(config.languages) if config.languages else "Todos"
         await interaction.response.send_message(
             f"**Canal:** {channel}\n**Ubicación:** {config.location}\n"
-            f"**Antigüedad máxima:** {config.max_age_hours:g} horas\n"
+            f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}\n"
             f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}\n"
             f"**Idiomas:** {languages}",
             ephemeral=True,
@@ -214,7 +230,7 @@ class AdminCog(commands.Cog):
             f"**Estado:** online\n**Portales activos:** LinkedIn\n"
             f"**Latencia:** {self.bot.latency * 1000:.0f} ms\n"
             f"**Ofertas enviadas:** {total}\n**Intervalo:** {interval:g} min\n"
-            f"**Antigüedad máxima:** {config.max_age_hours:g} horas",
+            f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}",
             ephemeral=True,
         )
 

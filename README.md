@@ -57,8 +57,8 @@ Todos los comandos administrativos requieren `Manage Server`:
 
 - `/set-channel`: selecciona el canal de avisos.
 - `/set-location`: define una ciudad, país o ubicación como `Remote`.
-- `/set-max-age`: define cuántas horas hacia atrás buscar, desde 0.0167
-  horas (1 minuto) hasta 168 horas.
+- `/set-max-age`: define cuántas horas hacia atrás buscar, desde 10 minutos
+  (0.1667 horas) hasta 24 horas. Por ejemplo `0.5` son 30 minutos.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
   `/add-keyword` acepta varias keywords separadas por comas, por ejemplo:
   `backend, frontend, python`. `/remove-keyword` acepta el mismo formato.
@@ -72,7 +72,8 @@ Todos los comandos administrativos requieren `Manage Server`:
 
 Cada servidor tiene su propia ubicación, canal, keywords e historial de
 vacantes notificadas. El bot consulta las ofertas publicadas durante las
-últimas 24 horas y evita duplicados por servidor.
+últimas 24 horas y evita duplicados por servidor. El historial de avisos se
+purga automáticamente después de 25 horas para no llenar la base de datos.
 
 El filtro local prioriza coincidencias en el título, reconoce variantes como
 `backend`/`back-end` y `ingeniero de software`/`software engineer`, y usa la

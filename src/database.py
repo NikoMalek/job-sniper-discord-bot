@@ -8,6 +8,10 @@ from typing import Any
 
 import aiosqlite
 
+MIN_MAX_AGE_HOURS = 10 / 60
+MAX_MAX_AGE_HOURS = 24.0
+NOTIFIED_RETENTION_HOURS = MAX_MAX_AGE_HOURS + 1.0
+
 
 @dataclass(frozen=True, slots=True)
 class GuildMonitorConfig:
@@ -76,6 +80,9 @@ class Database:
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_notified_jobs_created_at
+                    ON notified_jobs(created_at);
                 """
             )
             columns_cursor = await connection.execute("PRAGMA table_info(guild_configs)")
@@ -84,6 +91,14 @@ class Database:
                 await connection.execute(
                     "ALTER TABLE guild_configs ADD COLUMN max_age_hours REAL NOT NULL DEFAULT 24.0"
                 )
+            await connection.execute(
+                "UPDATE guild_configs SET max_age_hours = ? WHERE max_age_hours > ?",
+                (MAX_MAX_AGE_HOURS, MAX_MAX_AGE_HOURS),
+            )
+            await connection.execute(
+                "UPDATE guild_configs SET max_age_hours = ? WHERE max_age_hours < ?",
+                (MIN_MAX_AGE_HOURS, MIN_MAX_AGE_HOURS),
+            )
             await connection.commit()
 
     async def _ensure_guild(self, guild_id: int) -> None:
@@ -316,6 +331,18 @@ class Database:
                 (guild_id,),
             )
             return {row[0] for row in await cursor.fetchall()}
+
+    async def cleanup_notified_jobs(
+        self, hours: float = NOTIFIED_RETENTION_HOURS
+    ) -> int:
+        """Delete notification history older than ``hours`` and return how many."""
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "DELETE FROM notified_jobs WHERE created_at < datetime('now', ?)",
+                (f"-{float(hours):g} hours",),
+            )
+            await connection.commit()
+            return cursor.rowcount
 
     async def count_notified(self, guild_id: int) -> int:
         async with aiosqlite.connect(self.path) as connection:

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands, tasks
 
-from ...database import GuildMonitorConfig
+from ...database import NOTIFIED_RETENTION_HOURS, GuildMonitorConfig
 from ...notifier import send_job
 from ...scrapers import ACTIVE_SCRAPERS, BaseScraper, Job
 from lingua import Language, LanguageDetectorBuilder
@@ -55,6 +55,13 @@ class MonitorCog(commands.Cog):
         configs = await self.database.get_monitor_configs()
         for config in configs:
             await self._process_guild(config)
+        removed = await self.database.cleanup_notified_jobs()
+        if removed:
+            LOGGER.info(
+                "Pruned %d notification records older than %.0f hours",
+                removed,
+                NOTIFIED_RETENTION_HOURS,
+            )
 
     @monitor_loop.before_loop
     async def before_monitor_loop(self) -> None:
