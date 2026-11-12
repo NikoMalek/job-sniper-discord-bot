@@ -67,21 +67,52 @@ class AdminCog(commands.Cog):
     @app_commands.checks.has_permissions(manage_guild=True)
     async def add_keyword(self, interaction: discord.Interaction, keyword: str) -> None:
         try:
-            clean_keyword = self._clean(keyword, "La palabra clave")
+            keywords = [
+                self._clean(value, "La palabra clave")
+                for value in keyword.split(",")
+                if value.strip()
+            ]
         except ValueError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
-        added = await self.database.add_keyword(interaction.guild_id or 0, clean_keyword)
-        message = "Palabra clave agregada." if added else "Esa palabra clave ya estaba configurada."
+        if not keywords:
+            await interaction.response.send_message(
+                "Debes indicar al menos una palabra clave.",
+                ephemeral=True,
+            )
+            return
+
+        added_keywords = [
+            value
+            for value in dict.fromkeys(keywords)
+            if await self.database.add_keyword(interaction.guild_id or 0, value)
+        ]
+        if added_keywords:
+            message = f"Palabras clave agregadas: **{', '.join(added_keywords)}**."
+        else:
+            message = "Todas las palabras clave ya estaban configuradas."
         await interaction.response.send_message(message, ephemeral=True)
 
     @app_commands.command(name="remove-keyword", description="Elimina una palabra clave.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
     async def remove_keyword(self, interaction: discord.Interaction, keyword: str) -> None:
-        clean_keyword = " ".join(keyword.split()).strip()
-        removed = await self.database.remove_keyword(interaction.guild_id or 0, clean_keyword)
-        message = "Palabra clave eliminada." if removed else "No encontré esa palabra clave."
+        keywords = [" ".join(value.split()).strip() for value in keyword.split(",") if value.strip()]
+        if not keywords:
+            await interaction.response.send_message(
+                "Debes indicar al menos una palabra clave.",
+                ephemeral=True,
+            )
+            return
+        removed_keywords = [
+            value
+            for value in dict.fromkeys(keywords)
+            if await self.database.remove_keyword(interaction.guild_id or 0, value)
+        ]
+        if removed_keywords:
+            message = f"Palabras clave eliminadas: **{', '.join(removed_keywords)}**."
+        else:
+            message = "No encontré ninguna de esas palabras clave."
         await interaction.response.send_message(message, ephemeral=True)
 
     @app_commands.command(name="add-blacklist-company", description="Ignora vacantes de una empresa.")

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+import unicodedata
 from typing import TYPE_CHECKING
 
 import discord
@@ -17,6 +19,15 @@ if TYPE_CHECKING:
     from ..client import JobSniperBot
 
 LOGGER = logging.getLogger(__name__)
+
+KEYWORD_ALIASES: dict[str, tuple[str, ...]] = {
+    "ingeniero de software": ("software engineer",),
+    "ingeniera de software": ("software engineer",),
+    "frontend": ("front-end", "front end"),
+    "backend": ("back-end", "back end"),
+    "devops": ("dev-ops", "dev ops"),
+    "informatica": ("informática",),
+}
 
 
 class MonitorCog(commands.Cog):
@@ -39,6 +50,50 @@ class MonitorCog(commands.Cog):
     @monitor_loop.before_loop
     async def before_monitor_loop(self) -> None:
         await self.bot.wait_until_ready()
+
+    @staticmethod
+    def _normalize(value: str) -> str:
+        normalized = unicodedata.normalize("NFKD", value.casefold())
+        without_accents = "".join(
+            character for character in normalized
+            if not unicodedata.combining(character)
+        )
+        return " ".join(without_accents.split())
+
+    @classmethod
+    def _keyword_variants(cls, keyword: str) -> tuple[str, ...]:
+        term = cls._normalize(keyword)
+        if not term:
+            return ()
+        aliases = KEYWORD_ALIASES.get(term, ())
+        return (term, *aliases)
+
+    @classmethod
+    def _contains_term(cls, text: str, term: str) -> bool:
+        normalized_text = cls._normalize(text)
+        normalized_term = cls._normalize(term)
+        return re.search(rf"(?<!\w){re.escape(normalized_term)}(?!\w)", normalized_text) is not None
+
+    @classmethod
+    def _matches_keyword(cls, job: Job, keyword: str) -> bool:
+        variants = cls._keyword_variants(keyword)
+        if not variants:
+            return False
+        title = job.title
+        description = job.description
+        if any(cls._contains_term(title, variant) for variant in variants):
+            return True
+
+        for variant in variants:
+            words = variant.split()
+            if len(words) > 1:
+                title_words = set(cls._normalize(title).split())
+                overlap = sum(word in title_words for word in words) / len(words)
+                if overlap >= 0.5:
+                    return True
+            elif cls._contains_term(description, variant):
+                return True
+        return False
 
     async def _process_guild(self, config: GuildMonitorConfig) -> None:
         if config.channel_id is None:
@@ -68,6 +123,13 @@ class MonitorCog(commands.Cog):
                 continue
             jobs.update({job.id: job for job in result})
         for job in jobs.values():
+            if not any(self._matches_keyword(job, keyword) for keyword in config.keywords):
+                LOGGER.info(
+                    "Skipping non-matching job %s for guild %s",
+                    job.title,
+                    config.guild_id,
+                )
+                continue
             if any(
                 blocked.casefold() in job.company.casefold()
                 for blocked in config.blacklisted_companies
