@@ -16,6 +16,7 @@ class GuildMonitorConfig:
     location: str
     keywords: list[str]
     blacklisted_companies: list[str]
+    languages: list[str]
     max_age_hours: float
 
 
@@ -53,6 +54,15 @@ class Database:
                     guild_id INTEGER NOT NULL,
                     company TEXT NOT NULL,
                     UNIQUE (guild_id, company),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS guild_languages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    language TEXT NOT NULL,
+                    UNIQUE (guild_id, language),
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
@@ -164,6 +174,28 @@ class Database:
             await connection.commit()
             return cursor.rowcount == 1
 
+    async def add_language(self, guild_id: int, language: str) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                INSERT OR IGNORE INTO guild_languages (guild_id, language)
+                VALUES (?, ?)
+                """,
+                (guild_id, language),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
+    async def remove_language(self, guild_id: int, language: str) -> bool:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "DELETE FROM guild_languages WHERE guild_id = ? AND language = ?",
+                (guild_id, language),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
     async def get_guild_config(self, guild_id: int) -> GuildMonitorConfig:
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
@@ -192,6 +224,11 @@ class Database:
             blacklisted_companies = [
                 row["company"] for row in await blacklist_cursor.fetchall()
             ]
+            language_cursor = await connection.execute(
+                "SELECT language FROM guild_languages WHERE guild_id = ? ORDER BY language",
+                (guild_id,),
+            )
+            languages = [row["language"] for row in await language_cursor.fetchall()]
         if config is None:
             raise RuntimeError(f"Guild configuration was not created: {guild_id}")
         return GuildMonitorConfig(
@@ -200,6 +237,7 @@ class Database:
             location=config["location"],
             keywords=keywords,
             blacklisted_companies=blacklisted_companies,
+            languages=languages,
             max_age_hours=float(config["max_age_hours"]),
         )
 
@@ -232,6 +270,11 @@ class Database:
                 blacklisted_companies = [
                     row["company"] for row in await blacklist_cursor.fetchall()
                 ]
+                language_cursor = await connection.execute(
+                    "SELECT language FROM guild_languages WHERE guild_id = ? ORDER BY language",
+                    (config["guild_id"],),
+                )
+                languages = [row["language"] for row in await language_cursor.fetchall()]
                 if keywords:
                     result.append(
                         GuildMonitorConfig(
@@ -240,6 +283,7 @@ class Database:
                             location=config["location"],
                             keywords=keywords,
                             blacklisted_companies=blacklisted_companies,
+                            languages=languages,
                             max_age_hours=float(config["max_age_hours"]),
                         )
                     )
@@ -264,6 +308,14 @@ class Database:
                 (guild_id, job_id),
             )
             await connection.commit()
+
+    async def get_notified_job_ids(self, guild_id: int) -> set[str]:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT job_id FROM notified_jobs WHERE guild_id = ?",
+                (guild_id,),
+            )
+            return {row[0] for row in await cursor.fetchall()}
 
     async def count_notified(self, guild_id: int) -> int:
         async with aiosqlite.connect(self.path) as connection:

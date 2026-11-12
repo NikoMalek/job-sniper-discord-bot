@@ -14,6 +14,7 @@ from discord.ext import commands, tasks
 from ...database import GuildMonitorConfig
 from ...notifier import send_job
 from ...scrapers import ACTIVE_SCRAPERS, BaseScraper, Job
+from lingua import Language, LanguageDetectorBuilder
 
 if TYPE_CHECKING:
     from ..client import JobSniperBot
@@ -28,6 +29,14 @@ KEYWORD_ALIASES: dict[str, tuple[str, ...]] = {
     "devops": ("dev-ops", "dev ops"),
     "informatica": ("informática",),
 }
+LANGUAGE_MAP = {
+    "spanish": Language.SPANISH,
+    "english": Language.ENGLISH,
+    "portuguese": Language.PORTUGUESE,
+    "french": Language.FRENCH,
+    "german": Language.GERMAN,
+}
+LANGUAGE_DETECTOR = LanguageDetectorBuilder.from_languages(*LANGUAGE_MAP.values()).build()
 
 
 class MonitorCog(commands.Cog):
@@ -95,6 +104,35 @@ class MonitorCog(commands.Cog):
                 return True
         return False
 
+    @classmethod
+    def _matches_language(cls, job: Job, languages: list[str]) -> bool:
+        if not languages:
+            return True
+        allowed = {LANGUAGE_MAP[language] for language in languages if language in LANGUAGE_MAP}
+        if not allowed:
+            return True
+
+        title = job.title.strip()
+        if len(title) >= 20:
+            detected_title = LANGUAGE_DETECTOR.detect_language_of(title)
+            if detected_title in allowed:
+                return True
+
+        fragments = re.split(r"(?<=[.!?])\s+|\n{1,}", job.description)
+        detected_fragments = 0
+        for fragment in fragments:
+            clean_fragment = " ".join(fragment.split()).strip()
+            if len(clean_fragment) < 30:
+                continue
+            detected = LANGUAGE_DETECTOR.detect_language_of(clean_fragment)
+            if detected is None:
+                continue
+            detected_fragments += 1
+            if detected in allowed:
+                return True
+
+        return detected_fragments == 0
+
     async def _process_guild(self, config: GuildMonitorConfig) -> None:
         if config.channel_id is None:
             return
@@ -109,9 +147,15 @@ class MonitorCog(commands.Cog):
             LOGGER.warning("Configured channel %s cannot receive messages", config.channel_id)
             return
 
+        known_job_ids = await self.database.get_notified_job_ids(config.guild_id)
         results = await asyncio.gather(
             *(
-                scraper.fetch_jobs(config.keywords, config.location, config.max_age_hours)
+                scraper.fetch_jobs(
+                    config.keywords,
+                    config.location,
+                    config.max_age_hours,
+                    known_job_ids=known_job_ids,
+                )
                 for scraper in self.scrapers
             ),
             return_exceptions=True,
@@ -123,6 +167,9 @@ class MonitorCog(commands.Cog):
                 continue
             jobs.update({job.id: job for job in result})
         for job in jobs.values():
+            if not self._matches_language(job, config.languages):
+                LOGGER.info("Skipping language-mismatched job %s for guild %s", job.title, config.guild_id)
+                continue
             if not any(self._matches_keyword(job, keyword) for keyword in config.keywords):
                 LOGGER.info(
                     "Skipping non-matching job %s for guild %s",

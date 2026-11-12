@@ -8,6 +8,7 @@ from discord.ext import commands
 from typing import TYPE_CHECKING
 
 from ...database import Database
+from ...languages import SUPPORTED_LANGUAGES, parse_languages
 
 if TYPE_CHECKING:
     from ..client import JobSniperBot
@@ -141,6 +142,50 @@ class AdminCog(commands.Cog):
         message = "Empresa eliminada de la blacklist." if removed else "No encontré esa empresa."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @app_commands.command(name="add-language", description="Configura idiomas permitidos para vacantes.")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def add_language(self, interaction: discord.Interaction, language: str) -> None:
+        languages = parse_languages(language)
+        if not languages:
+            await interaction.response.send_message(
+                "Debes indicar al menos un idioma.", ephemeral=True
+            )
+            return
+        unsupported = [
+            value for value in dict.fromkeys(languages) if value not in SUPPORTED_LANGUAGES
+        ]
+        if unsupported:
+            await interaction.response.send_message(
+                f"Idiomas no soportados: **{', '.join(unsupported)}**. "
+                "Usa español, inglés, portugués, francés o alemán.",
+                ephemeral=True,
+            )
+            return
+        added = [
+            value for value in dict.fromkeys(languages)
+            if await self.database.add_language(interaction.guild_id or 0, value)
+        ]
+        message = f"Idiomas agregados: **{', '.join(added)}**." if added else "Esos idiomas ya estaban configurados."
+        await interaction.response.send_message(message, ephemeral=True)
+
+    @app_commands.command(name="remove-language", description="Elimina idiomas permitidos.")
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def remove_language(self, interaction: discord.Interaction, language: str) -> None:
+        languages = parse_languages(language)
+        if not languages:
+            await interaction.response.send_message(
+                "Debes indicar al menos un idioma.", ephemeral=True
+            )
+            return
+        removed = [
+            value for value in dict.fromkeys(languages)
+            if await self.database.remove_language(interaction.guild_id or 0, value)
+        ]
+        message = f"Idiomas eliminados: **{', '.join(removed)}**." if removed else "No encontré esos idiomas."
+        await interaction.response.send_message(message, ephemeral=True)
+
     @app_commands.command(name="list-keywords", description="Muestra la configuración del servidor.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -149,10 +194,12 @@ class AdminCog(commands.Cog):
         channel = f"<#{config.channel_id}>" if config.channel_id else "No configurado"
         keywords = ", ".join(config.keywords) if config.keywords else "Ninguna"
         blacklist = ", ".join(config.blacklisted_companies) if config.blacklisted_companies else "Ninguna"
+        languages = ", ".join(config.languages) if config.languages else "Todos"
         await interaction.response.send_message(
             f"**Canal:** {channel}\n**Ubicación:** {config.location}\n"
             f"**Antigüedad máxima:** {config.max_age_hours:g} horas\n"
-            f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}",
+            f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}\n"
+            f"**Idiomas:** {languages}",
             ephemeral=True,
         )
 

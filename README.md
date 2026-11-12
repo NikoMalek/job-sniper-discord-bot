@@ -65,6 +65,8 @@ Todos los comandos administrativos requieren `Manage Server`:
 - `/add-blacklist-company` y `/remove-blacklist-company`: ignora o reactiva
   empresas específicas, aceptando coincidencias parciales sin distinguir
   mayúsculas.
+- `/add-language` y `/remove-language`: configura idiomas permitidos,
+  por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-keywords`: muestra la configuración actual.
 - `/status`: muestra latencia, portales y número de avisos enviados.
 
