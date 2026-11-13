@@ -12,6 +12,15 @@ from .scrapers.base import Job
 LOGGER = logging.getLogger(__name__)
 
 LINKEDIN_ICON = "https://img.icons8.com/color/96/linkedin.png"
+CHILETRABAJOS_ICON = "https://s3.amazonaws.com/cht2/front/img/logo.png"
+SOURCE_COLORS = {
+    "linkedin": discord.Colour.from_rgb(10, 102, 194),
+    "chiletrabajos": discord.Colour.from_rgb(31, 83, 114),
+}
+SOURCE_ICONS = {
+    "linkedin": LINKEDIN_ICON,
+    "chiletrabajos": CHILETRABAJOS_ICON,
+}
 
 
 def _display(value: str, fallback: str = "No especificada", limit: int = 1024) -> str:
@@ -43,18 +52,16 @@ def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
     sources = list(dict.fromkeys(_display(job.source, "Portal de empleo", 256) for job in jobs))
     source = sources[0]
     source_key = source.casefold()
-    source_colors = {
-        "linkedin": discord.Colour.from_rgb(10, 102, 194),
-    }
     embed = discord.Embed(
         title=_display(primary.title, "Vacante sin título", 256),
         url=primary.url,
-        colour=source_colors.get(source_key, discord.Colour.blurple()),
+        colour=SOURCE_COLORS.get(source_key, discord.Colour.blurple()),
     )
     if len(sources) == 1:
         author = f"Nueva vacante · {source}"
-        if source_key == "linkedin":
-            embed.set_author(name=author, icon_url=LINKEDIN_ICON)
+        icon = SOURCE_ICONS.get(source_key)
+        if icon:
+            embed.set_author(name=author, icon_url=icon)
         else:
             embed.set_author(name=author)
     else:

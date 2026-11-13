@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from .base import BaseScraper, Job
+from .chiletrabajos import ChileTrabajosScraper
 from .http import HttpScraper
 from .linkedin import LinkedInScraper
 
 #: Slug -> singleton scraper. Instances are reused across cycles so in-memory
 #: caches (descriptions, per-cycle search results) keep working.
 SCRAPERS: dict[str, BaseScraper] = {
-    scraper.slug: scraper for scraper in (LinkedInScraper(),)
+    scraper.slug: scraper
+    for scraper in (LinkedInScraper(), ChileTrabajosScraper())
 }
 
 DEFAULT_PORTALS: tuple[str, ...] = ("linkedin",)
@@ -27,6 +29,7 @@ __all__ = [
     "DEFAULT_PORTALS",
     "SCRAPERS",
     "BaseScraper",
+    "ChileTrabajosScraper",
     "HttpScraper",
     "Job",
     "LinkedInScraper",
