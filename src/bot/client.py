@@ -24,6 +24,7 @@ class JobSniperBot(commands.Bot):
     async def setup_hook(self) -> None:
         await self.add_cog(self._admin_cog())
         await self.add_cog(self._monitor_cog())
+        await self.add_cog(self._onboarding_cog())
         synced = await self.tree.sync()
         LOGGER.info("Synchronized %d application commands", len(synced))
 
@@ -36,6 +37,11 @@ class JobSniperBot(commands.Bot):
         from .cogs.monitor import MonitorCog
 
         return MonitorCog(self)
+
+    def _onboarding_cog(self) -> commands.Cog:
+        from .cogs.onboarding import OnboardingCog
+
+        return OnboardingCog(self)
 
     async def on_ready(self) -> None:
         if self.user:
