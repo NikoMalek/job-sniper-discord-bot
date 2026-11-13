@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import datetime, timezone
 
 import discord
 
@@ -38,6 +39,21 @@ def _short_description(job: Job) -> str:
     if len(description) > available:
         description = f"{description[:available].rstrip(' .,;:')}..."
     return f"{description}{suffix}"
+
+
+def _relative_published(value: datetime) -> str:
+    posted = value.astimezone(timezone.utc)
+    seconds = max(int((datetime.now(timezone.utc) - posted).total_seconds()), 0)
+    if seconds < 60:
+        return "hace unos segundos"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"hace {minutes} minuto{'s' if minutes != 1 else ''}"
+    hours = minutes // 60
+    if hours < 24:
+        return f"hace {hours} hora{'s' if hours != 1 else ''}"
+    days = hours // 24
+    return f"hace {days} día{'s' if days != 1 else ''}"
 
 
 def build_job_embed(job: Job) -> discord.Embed:
@@ -86,7 +102,10 @@ def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
         description_parts.append("**Disponible en**\n" + "\n".join(links))
     embed.description = "\n\n".join(description_parts)
 
-    published = _display(primary.published_at, "Fecha no disponible", 256)
+    if primary.published_at_datetime is not None:
+        published = _relative_published(primary.published_at_datetime)
+    else:
+        published = _display(primary.published_at, "Fecha no disponible", 256)
     source_label = "Fuentes" if len(sources) > 1 else "Fuente"
     embed.set_footer(
         text=f"{source_label}: {', '.join(sources)} • Publicada: {published}",

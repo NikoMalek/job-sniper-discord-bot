@@ -349,6 +349,7 @@ class ChileTrabajosScraper(HttpScraper):
                 ),
                 description=description,
                 published_at=cls._format_published(posted),
+                published_at_datetime=posted,
             ),
             posted,
         )
