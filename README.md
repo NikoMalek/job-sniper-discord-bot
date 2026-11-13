@@ -20,7 +20,9 @@ python -m src.main
 ```
 
 Completa `DISCORD_BOT_TOKEN` en `.env`. `DB_PATH` usa `data/jobs.db` por
-defecto y `CHECK_INTERVAL_MINUTES` usa 5 minutos.
+defecto y `CHECK_INTERVAL_MINUTES` usa 5 minutos. `LOG_LEVEL` controla el
+detalle de los logs (`DEBUG`, `INFO`, `WARNING`, `ERROR`); por defecto `INFO`.
+Los informativos van a stdout y los warnings/errores a stderr.
 
 ## Flujo de contribución
 
@@ -67,13 +69,23 @@ Todos los comandos administrativos requieren `Manage Server`:
   mayúsculas.
 - `/add-language` y `/remove-language`: configura idiomas permitidos,
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
-- `/list-keywords`: muestra la configuración actual.
+- `/list-languages`: muestra los idiomas disponibles y los activos.
+- `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
+  desde una lista. Cada servidor debe conservar al menos uno activo.
+- `/list-portals`: muestra los portales disponibles y los activos.
+- `/list-keywords`: muestra la configuración actual, incluidos los portales.
 - `/status`: muestra latencia, portales y número de avisos enviados.
 
-Cada servidor tiene su propia ubicación, canal, keywords e historial de
+Cada servidor tiene su propia ubicación, canal, keywords, portales e historial de
 vacantes notificadas. El bot consulta las ofertas publicadas durante las
-últimas 24 horas y evita duplicados por servidor. El historial de avisos se
-purga automáticamente después de 25 horas para no llenar la base de datos.
+últimas 24 horas y evita reenviar la misma vacante del mismo portal. El
+historial de avisos se purga automáticamente después de 25 horas para no llenar
+la base de datos.
+
+Si una misma vacante aparece en varios portales dentro del mismo ciclo, se envía
+un solo mensaje con un link por portal. Si aparece en otro portal en un ciclo
+posterior, se envía de nuevo, porque puede ser el portal que más le interese al
+servidor.
 
 El filtro local prioriza coincidencias en el título, reconoce variantes como
 `backend`/`back-end` y `ingeniero de software`/`software engineer`, y usa la

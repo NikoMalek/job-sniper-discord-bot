@@ -27,6 +27,15 @@ LANGUAGE_ALIASES: dict[str, str] = {
 
 SUPPORTED_LANGUAGES: frozenset[str] = frozenset(LANGUAGE_ALIASES.values())
 
+#: Canonical language -> label shown in Discord. Insertion order is the display order.
+LANGUAGE_LABELS: dict[str, str] = {
+    "spanish": "español",
+    "english": "inglés",
+    "portuguese": "portugués",
+    "french": "francés",
+    "german": "alemán",
+}
+
 
 def normalize_language(value: str) -> str:
     """Return the canonical language name, or the cleaned value if unknown."""

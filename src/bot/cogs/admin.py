@@ -8,10 +8,20 @@ from discord.ext import commands
 from typing import TYPE_CHECKING
 
 from ...database import MAX_MAX_AGE_HOURS, MIN_MAX_AGE_HOURS, Database
-from ...languages import SUPPORTED_LANGUAGES, parse_languages
+from ...languages import LANGUAGE_LABELS, SUPPORTED_LANGUAGES, parse_languages
+from ...scrapers import SCRAPERS, portal_names
 
 if TYPE_CHECKING:
     from ..client import JobSniperBot
+
+PORTAL_CHOICES = [
+    app_commands.Choice(name=scraper.source, value=slug)
+    for slug, scraper in SCRAPERS.items()
+]
+LANGUAGE_CHOICES = [
+    app_commands.Choice(name=f"{label.title()} ({language})", value=language)
+    for language, label in LANGUAGE_LABELS.items()
+]
 
 
 class AdminCog(commands.Cog):
@@ -132,6 +142,20 @@ class AdminCog(commands.Cog):
             message = "No encontré ninguna de esas palabras clave."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @remove_keyword.autocomplete("keyword")
+    async def remove_keyword_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        if interaction.guild_id is None:
+            return []
+        config = await self.database.get_guild_config(interaction.guild_id)
+        normalized_current = current.casefold().strip()
+        return [
+            app_commands.Choice(name=keyword, value=keyword)
+            for keyword in config.keywords
+            if normalized_current in keyword.casefold()
+        ][:25]
+
     @app_commands.command(name="add-blacklist-company", description="Ignora vacantes de una empresa.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -159,10 +183,14 @@ class AdminCog(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
 
     @app_commands.command(name="add-language", description="Configura idiomas permitidos para vacantes.")
+    @app_commands.describe(language="Idioma que quieres activar.")
+    @app_commands.choices(language=LANGUAGE_CHOICES)
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def add_language(self, interaction: discord.Interaction, language: str) -> None:
-        languages = parse_languages(language)
+    async def add_language(
+        self, interaction: discord.Interaction, language: app_commands.Choice[str]
+    ) -> None:
+        languages = parse_languages(language.value)
         if not languages:
             await interaction.response.send_message(
                 "Debes indicar al menos un idioma.", ephemeral=True
@@ -186,10 +214,14 @@ class AdminCog(commands.Cog):
         await interaction.response.send_message(message, ephemeral=True)
 
     @app_commands.command(name="remove-language", description="Elimina idiomas permitidos.")
+    @app_commands.describe(language="Idioma que quieres desactivar.")
+    @app_commands.choices(language=LANGUAGE_CHOICES)
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
-    async def remove_language(self, interaction: discord.Interaction, language: str) -> None:
-        languages = parse_languages(language)
+    async def remove_language(
+        self, interaction: discord.Interaction, language: app_commands.Choice[str]
+    ) -> None:
+        languages = parse_languages(language.value)
         if not languages:
             await interaction.response.send_message(
                 "Debes indicar al menos un idioma.", ephemeral=True
@@ -202,6 +234,105 @@ class AdminCog(commands.Cog):
         message = f"Idiomas eliminados: **{', '.join(removed)}**." if removed else "No encontré esos idiomas."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @app_commands.command(
+        name="add-portal",
+        description="Activa un portal de empleo para este servidor.",
+    )
+    @app_commands.describe(portal="Portal que quieres activar.")
+    @app_commands.choices(portal=PORTAL_CHOICES)
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def add_portal(
+        self, interaction: discord.Interaction, portal: app_commands.Choice[str]
+    ) -> None:
+        added = await self.database.add_portal(
+            interaction.guild_id or 0, portal.value
+        )
+        if added:
+            message = f"Portal activado: **{portal.name}**."
+        else:
+            message = f"El portal **{portal.name}** ya estaba activo."
+        await interaction.response.send_message(message, ephemeral=True)
+
+    @app_commands.command(
+        name="remove-portal",
+        description="Desactiva un portal de empleo de este servidor.",
+    )
+    @app_commands.describe(portal="Portal que quieres desactivar.")
+    @app_commands.choices(portal=PORTAL_CHOICES)
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def remove_portal(
+        self, interaction: discord.Interaction, portal: app_commands.Choice[str]
+    ) -> None:
+        config = await self.database.get_guild_config(interaction.guild_id or 0)
+        if portal.value not in config.portals:
+            await interaction.response.send_message(
+                f"El portal **{portal.name}** no estaba activo.",
+                ephemeral=True,
+            )
+            return
+        if len(config.portals) <= 1:
+            await interaction.response.send_message(
+                "No puedes desactivar el último portal. Activa otro antes de quitarlo.",
+                ephemeral=True,
+            )
+            return
+        removed = await self.database.remove_portal(
+            interaction.guild_id or 0, portal.value
+        )
+        message = (
+            f"Portal desactivado: **{portal.name}**."
+            if removed
+            else f"El portal **{portal.name}** no estaba activo."
+        )
+        await interaction.response.send_message(message, ephemeral=True)
+
+    @app_commands.command(
+        name="list-languages",
+        description="Muestra los idiomas disponibles y los activos en este servidor.",
+    )
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def list_languages(self, interaction: discord.Interaction) -> None:
+        config = await self.database.get_guild_config(interaction.guild_id or 0)
+        available = "\n".join(
+            f"• **{label}** — `{language}`"
+            for language, label in LANGUAGE_LABELS.items()
+        )
+        active = (
+            ", ".join(LANGUAGE_LABELS.get(value, value) for value in config.languages)
+            or "Todos (sin filtro)"
+        )
+        await interaction.response.send_message(
+            f"**Idiomas disponibles**\n{available}\n\n"
+            f"**Activos en este servidor:** {active}\n\n"
+            "Puedes usar el nombre o el código con `/add-language` y `/remove-language`.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="list-portals",
+        description="Muestra los portales disponibles y los activos en este servidor.",
+    )
+    @app_commands.guild_only()
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def list_portals(self, interaction: discord.Interaction) -> None:
+        config = await self.database.get_guild_config(interaction.guild_id or 0)
+        active_slugs = set(config.portals)
+        available = "\n".join(
+            f"• **{scraper.source}** (`{slug}`) — "
+            f"{'activo' if slug in active_slugs else 'no activo'}"
+            for slug, scraper in SCRAPERS.items()
+        ) or "Ninguno"
+        active = ", ".join(portal_names(config.portals)) or "Ninguno"
+        await interaction.response.send_message(
+            f"**Portales disponibles**\n{available}\n\n"
+            f"**Activos en este servidor:** {active}\n\n"
+            "Usa `/add-portal` y `/remove-portal` para cambiarlos.",
+            ephemeral=True,
+        )
+
     @app_commands.command(name="list-keywords", description="Muestra la configuración del servidor.")
     @app_commands.guild_only()
     @app_commands.checks.has_permissions(manage_guild=True)
@@ -211,8 +342,10 @@ class AdminCog(commands.Cog):
         keywords = ", ".join(config.keywords) if config.keywords else "Ninguna"
         blacklist = ", ".join(config.blacklisted_companies) if config.blacklisted_companies else "Ninguna"
         languages = ", ".join(config.languages) if config.languages else "Todos"
+        portals = ", ".join(portal_names(config.portals)) or "Ninguno"
         await interaction.response.send_message(
             f"**Canal:** {channel}\n**Ubicación:** {config.location}\n"
+            f"**Portales:** {portals}\n"
             f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}\n"
             f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}\n"
             f"**Idiomas:** {languages}",
@@ -226,8 +359,9 @@ class AdminCog(commands.Cog):
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         total = await self.database.count_notified(interaction.guild_id or 0)
         interval = self.bot.settings.check_interval_minutes
+        portals = ", ".join(portal_names(config.portals)) or "Ninguno"
         await interaction.response.send_message(
-            f"**Estado:** online\n**Portales activos:** LinkedIn\n"
+            f"**Estado:** online\n**Portales activos:** {portals}\n"
             f"**Latencia:** {self.bot.latency * 1000:.0f} ms\n"
             f"**Ofertas enviadas:** {total}\n**Intervalo:** {interval:g} min\n"
             f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}",
