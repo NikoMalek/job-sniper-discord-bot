@@ -22,7 +22,6 @@ python -m src.main
 Completa `DISCORD_BOT_TOKEN` en `.env`. `DB_PATH` usa `data/jobs.db` por
 defecto y `CHECK_INTERVAL_MINUTES` usa 5 minutos. `LOG_LEVEL` controla el
 detalle de los logs (`DEBUG`, `INFO`, `WARNING`, `ERROR`); por defecto `INFO`.
-Los informativos van a stdout y los warnings/errores a stderr.
 
 ## Flujo de contribución
 
@@ -55,8 +54,17 @@ Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
 
 ## Uso
 
-Todos los comandos administrativos requieren `Manage Server`:
+Al unirse a un servidor, y una sola vez en los servidores donde ya estaba, el
+bot envía una guía con los comandos principales. Se marca como enviada para no
+repetirla.
 
+Los comandos de configuración requieren `Manage Server`. Para dar acceso a un
+rol o usuario concreto, usa Ajustes del servidor → Integraciones → Job Sniper.
+
+Comandos:
+
+- `/help`: muestra los pasos iniciales, la configuración avanzada y los
+  comandos para consultar el estado del bot.
 - `/set-channel`: selecciona el canal de avisos.
 - `/set-location`: define una ciudad, país o ubicación como `Remote`.
 - `/set-max-age`: define cuántas horas hacia atrás buscar, desde 10 minutos

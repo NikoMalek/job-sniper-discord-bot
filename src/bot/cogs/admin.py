@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -13,6 +14,8 @@ from ...scrapers import SCRAPERS, portal_names
 
 if TYPE_CHECKING:
     from ..client import JobSniperBot
+
+LOGGER = logging.getLogger(__name__)
 
 PORTAL_CHOICES = [
     app_commands.Choice(name=scraper.source, value=slug)
@@ -47,7 +50,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="set-channel", description="Configura el canal de notificaciones.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def set_channel(self, interaction: discord.Interaction, channel: discord.TextChannel) -> None:
         await self.database.set_channel(interaction.guild_id or 0, channel.id)
         await interaction.response.send_message(
@@ -56,7 +59,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="set-location", description="Configura país o ciudad de búsqueda.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def set_location(self, interaction: discord.Interaction, location: str) -> None:
         try:
             clean_location = self._clean(location, "La ubicación")
@@ -74,7 +77,7 @@ class AdminCog(commands.Cog):
         hours="Horas hacia atrás. En español usa coma decimal: 0,5 son 30 minutos."
     )
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def set_max_age(self, interaction: discord.Interaction, hours: float) -> None:
         if not MIN_MAX_AGE_HOURS <= hours <= MAX_MAX_AGE_HOURS:
             await interaction.response.send_message(
@@ -91,7 +94,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="add-keyword", description="Agrega una palabra clave.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def add_keyword(self, interaction: discord.Interaction, keyword: str) -> None:
         try:
             keywords = [
@@ -122,7 +125,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="remove-keyword", description="Elimina una palabra clave.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def remove_keyword(self, interaction: discord.Interaction, keyword: str) -> None:
         keywords = [" ".join(value.split()).strip() for value in keyword.split(",") if value.strip()]
         if not keywords:
@@ -158,7 +161,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="add-blacklist-company", description="Ignora vacantes de una empresa.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def add_blacklist_company(self, interaction: discord.Interaction, company: str) -> None:
         try:
             clean_company = self._clean(company, "La empresa")
@@ -175,18 +178,66 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="remove-blacklist-company", description="Deja de ignorar una empresa.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def remove_blacklist_company(self, interaction: discord.Interaction, company: str) -> None:
         clean_company = " ".join(company.split()).strip()
         removed = await self.database.remove_blacklisted_company(interaction.guild_id or 0, clean_company)
         message = "Empresa eliminada de la blacklist." if removed else "No encontré esa empresa."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @app_commands.command(name="help", description="Muestra cómo configurar Job Sniper.")
+    @app_commands.guild_only()
+    async def help_command(self, interaction: discord.Interaction) -> None:
+        embed = discord.Embed(
+            title="Ayuda de Job Sniper",
+            description=(
+                "Job Sniper monitorea ofertas de empleo y envía avisos al canal "
+                "que configures cuando encuentra coincidencias."
+            ),
+            colour=0x0A66C2,
+        )
+        embed.add_field(
+            name="🚀 Primeros Pasos",
+            value=(
+                "1. `/set-channel` — elige dónde se publicarán las alertas. "
+                "No hay un canal predeterminado.\n"
+                "2. `/set-location` — define el país, ciudad o modalidad "
+                "`Remote` que quieres buscar. Por defecto es `Worldwide`.\n"
+                "3. `/add-keyword` — agrega los cargos o tecnologías que "
+                "quieres encontrar, por ejemplo `python, backend`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="⚙️ Configuración avanzada",
+            value=(
+                "`/set-max-age` — limita la antigüedad de las ofertas. "
+                "Por defecto busca las últimas 24 horas.\n"
+                "`/add-language` y `/remove-language` — filtra por idioma. "
+                "Por defecto acepta todos los idiomas.\n"
+                "`/add-portal` y `/remove-portal` — activa o desactiva "
+                "portales. LinkedIn está activo por defecto.\n"
+                "`/add-blacklist-company` y `/remove-blacklist-company` — "
+                "ignora o vuelve a permitir empresas."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="📋 Consultar configuración",
+            value=(
+                "Usa `/list-keywords`, `/list-languages` o `/list-portals` "
+                "para revisar cada sección. `/status` muestra un resumen "
+                "general y confirma si el bot está listo."
+            ),
+            inline=False,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
     @app_commands.command(name="add-language", description="Configura idiomas permitidos para vacantes.")
     @app_commands.describe(language="Idioma que quieres activar.")
     @app_commands.choices(language=LANGUAGE_CHOICES)
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def add_language(
         self, interaction: discord.Interaction, language: app_commands.Choice[str]
     ) -> None:
@@ -217,7 +268,7 @@ class AdminCog(commands.Cog):
     @app_commands.describe(language="Idioma que quieres desactivar.")
     @app_commands.choices(language=LANGUAGE_CHOICES)
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def remove_language(
         self, interaction: discord.Interaction, language: app_commands.Choice[str]
     ) -> None:
@@ -241,7 +292,7 @@ class AdminCog(commands.Cog):
     @app_commands.describe(portal="Portal que quieres activar.")
     @app_commands.choices(portal=PORTAL_CHOICES)
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def add_portal(
         self, interaction: discord.Interaction, portal: app_commands.Choice[str]
     ) -> None:
@@ -261,7 +312,7 @@ class AdminCog(commands.Cog):
     @app_commands.describe(portal="Portal que quieres desactivar.")
     @app_commands.choices(portal=PORTAL_CHOICES)
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def remove_portal(
         self, interaction: discord.Interaction, portal: app_commands.Choice[str]
     ) -> None:
@@ -293,7 +344,7 @@ class AdminCog(commands.Cog):
         description="Muestra los idiomas disponibles y los activos en este servidor.",
     )
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def list_languages(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         available = "\n".join(
@@ -316,7 +367,7 @@ class AdminCog(commands.Cog):
         description="Muestra los portales disponibles y los activos en este servidor.",
     )
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def list_portals(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         active_slugs = set(config.portals)
@@ -335,7 +386,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="list-keywords", description="Muestra la configuración del servidor.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def list_keywords(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         channel = f"<#{config.channel_id}>" if config.channel_id else "No configurado"
@@ -354,7 +405,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="status", description="Muestra el estado del bot en este servidor.")
     @app_commands.guild_only()
-    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.default_permissions(manage_guild=True)
     async def status(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
         total = await self.database.count_notified(interaction.guild_id or 0)
@@ -371,9 +422,10 @@ class AdminCog(commands.Cog):
     async def cog_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ) -> None:
-        if isinstance(error, app_commands.MissingPermissions):
-            message = "Necesitas permisos de administrador del servidor para usar este comando."
+        if isinstance(error, app_commands.CheckFailure):
+            message = "No tienes permiso para usar este comando."
         else:
+            LOGGER.error("Command failed in guild %s", interaction.guild_id, exc_info=error)
             message = "No se pudo completar el comando. Revisa los logs del bot."
         if interaction.response.is_done():
             await interaction.followup.send(message, ephemeral=True)
