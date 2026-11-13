@@ -106,7 +106,8 @@ caso de `429`, el ciclo se omite y el worker continúa ejecutándose.
 ChileTrabajos se consulta con las mismas keywords y se puede activar con
 `/add-portal` (por ejemplo `chiletrabajos`). Usa la fecha exacta del aviso para
 respetar la antigüedad configurada, por lo que el primer ciclo puede tardar algo
-más. Para ese portal conviene priorizar keywords de rol (`backend`, `frontend`,
-`desarrollador`, `programador`, `fullstack`, `devops`, `qa`) antes que términos
-genéricos como `informatica`. Requiere `tzdata` para interpretar las fechas de
-Chile en Windows.
+más. Revisa hasta 5 páginas de 30 avisos por keyword; para términos de rol
+normalmente basta la primera. Para ese portal conviene priorizar keywords de rol
+(`backend`, `frontend`, `desarrollador`, `programador`, `fullstack`, `devops`,
+`qa`) antes que términos genéricos como `informatica`. Requiere `tzdata` para
+interpretar las fechas de Chile en Windows.

@@ -88,7 +88,7 @@ class ChileTrabajosScraper(HttpScraper):
     )
 
     PAGE_SIZE = 30
-    MAX_PAGES_PER_KEYWORD = 3
+    MAX_PAGES_PER_KEYWORD = 5
     MAX_DETAILS_PER_CYCLE = 25
     DETAIL_DELAY_RANGE = (0.4, 0.9)
     SEARCH_PAGE_DELAY_RANGE = (0.5, 1.0)
