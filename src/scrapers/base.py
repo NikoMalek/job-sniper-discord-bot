@@ -20,7 +20,11 @@ class Job:
 
 
 class BaseScraper(ABC):
+    slug: str
     source: str
+
+    def begin_cycle(self) -> None:
+        """Reset per-cycle state. Called once before processing every guild."""
 
     @abstractmethod
     async def fetch_jobs(
@@ -34,4 +38,8 @@ class BaseScraper(ABC):
 
         ``known_job_ids`` contains jobs already notified for the guild being
         processed, so scrapers can avoid downloading their details again.
+
+        Implementations must guarantee: ``url`` is absolute, ``description``
+        may be empty (``""``) when the portal has no text, and ``published_at``
+        is human-readable text (it is displayed verbatim).
         """

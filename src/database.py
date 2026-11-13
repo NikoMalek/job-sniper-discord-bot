@@ -22,6 +22,7 @@ class GuildMonitorConfig:
     blacklisted_companies: list[str]
     languages: list[str]
     max_age_hours: float
+    portals: tuple[str, ...]
 
 
 class Database:
@@ -71,12 +72,20 @@ class Database:
                         ON DELETE CASCADE
                 );
 
+                CREATE TABLE IF NOT EXISTS guild_portals (
+                    guild_id INTEGER NOT NULL,
+                    source TEXT NOT NULL,
+                    UNIQUE (guild_id, source),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
                 CREATE TABLE IF NOT EXISTS notified_jobs (
                     guild_id INTEGER NOT NULL,
                     job_id TEXT NOT NULL,
                     source TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (guild_id, job_id),
+                    PRIMARY KEY (guild_id, source, job_id),
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
@@ -99,13 +108,71 @@ class Database:
                 "UPDATE guild_configs SET max_age_hours = ? WHERE max_age_hours < ?",
                 (MIN_MAX_AGE_HOURS, MIN_MAX_AGE_HOURS),
             )
+
+            # Old databases keyed notified jobs by (guild_id, job_id), which can
+            # collide when two portals reuse the same id. Rebuild the table with
+            # source in the primary key, preserving existing rows.
+            primary_key = await self._primary_key(connection, "notified_jobs")
+            if primary_key and primary_key != ["guild_id", "source", "job_id"]:
+                await connection.executescript(
+                    """
+                    ALTER TABLE notified_jobs RENAME TO notified_jobs_legacy;
+                    CREATE TABLE notified_jobs (
+                        guild_id INTEGER NOT NULL,
+                        job_id TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        PRIMARY KEY (guild_id, source, job_id),
+                        FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                            ON DELETE CASCADE
+                    );
+                    INSERT OR IGNORE INTO notified_jobs
+                        (guild_id, job_id, source, created_at)
+                    SELECT guild_id, job_id, source, created_at
+                    FROM notified_jobs_legacy;
+                    DROP TABLE notified_jobs_legacy;
+                    CREATE INDEX IF NOT EXISTS idx_notified_jobs_created_at
+                        ON notified_jobs(created_at);
+                    """
+                )
+
+            # Every existing guild keeps LinkedIn enabled unless it already has
+            # a portal selection.
+            await connection.execute(
+                """
+                INSERT OR IGNORE INTO guild_portals (guild_id, source)
+                SELECT guild_id, 'linkedin' FROM guild_configs
+                WHERE guild_id NOT IN (SELECT guild_id FROM guild_portals)
+                """
+            )
             await connection.commit()
+
+    @staticmethod
+    async def _primary_key(connection: aiosqlite.Connection, table: str) -> list[str]:
+        cursor = await connection.execute(f"PRAGMA index_list({table})")
+        for row in await cursor.fetchall():
+            name, unique, origin = row[1], row[2], row[3]
+            if origin != "pk" and not (unique and str(name).startswith("sqlite_autoindex_")):
+                continue
+            index_cursor = await connection.execute(f"PRAGMA index_info({name})")
+            return [column[2] for column in await index_cursor.fetchall()]
+        return []
 
     async def _ensure_guild(self, guild_id: int) -> None:
         async with aiosqlite.connect(self.path) as connection:
             await connection.execute(
                 "INSERT OR IGNORE INTO guild_configs (guild_id) VALUES (?)",
                 (guild_id,),
+            )
+            await connection.execute(
+                """
+                INSERT OR IGNORE INTO guild_portals (guild_id, source)
+                SELECT ?, 'linkedin'
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM guild_portals WHERE guild_id = ?
+                )
+                """,
+                (guild_id, guild_id),
             )
             await connection.commit()
 
@@ -211,6 +278,33 @@ class Database:
             await connection.commit()
             return cursor.rowcount == 1
 
+    async def get_portals(self, guild_id: int) -> list[str]:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT source FROM guild_portals WHERE guild_id = ? ORDER BY source",
+                (guild_id,),
+            )
+            return [row[0] for row in await cursor.fetchall()]
+
+    async def add_portal(self, guild_id: int, source: str) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "INSERT OR IGNORE INTO guild_portals (guild_id, source) VALUES (?, ?)",
+                (guild_id, source),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
+    async def remove_portal(self, guild_id: int, source: str) -> bool:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "DELETE FROM guild_portals WHERE guild_id = ? AND source = ?",
+                (guild_id, source),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
     async def get_guild_config(self, guild_id: int) -> GuildMonitorConfig:
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
@@ -244,6 +338,11 @@ class Database:
                 (guild_id,),
             )
             languages = [row["language"] for row in await language_cursor.fetchall()]
+            portal_cursor = await connection.execute(
+                "SELECT source FROM guild_portals WHERE guild_id = ? ORDER BY source",
+                (guild_id,),
+            )
+            portals = tuple(row["source"] for row in await portal_cursor.fetchall())
         if config is None:
             raise RuntimeError(f"Guild configuration was not created: {guild_id}")
         return GuildMonitorConfig(
@@ -254,6 +353,7 @@ class Database:
             blacklisted_companies=blacklisted_companies,
             languages=languages,
             max_age_hours=float(config["max_age_hours"]),
+            portals=portals,
         )
 
     async def get_monitor_configs(self) -> list[GuildMonitorConfig]:
@@ -290,6 +390,11 @@ class Database:
                     (config["guild_id"],),
                 )
                 languages = [row["language"] for row in await language_cursor.fetchall()]
+                portal_cursor = await connection.execute(
+                    "SELECT source FROM guild_portals WHERE guild_id = ? ORDER BY source",
+                    (config["guild_id"],),
+                )
+                portals = tuple(row["source"] for row in await portal_cursor.fetchall())
                 if keywords:
                     result.append(
                         GuildMonitorConfig(
@@ -300,6 +405,7 @@ class Database:
                             blacklisted_companies=blacklisted_companies,
                             languages=languages,
                             max_age_hours=float(config["max_age_hours"]),
+                            portals=portals,
                         )
                     )
         return result
@@ -316,21 +422,25 @@ class Database:
             await connection.commit()
             return cursor.rowcount == 1
 
-    async def remove_notified(self, guild_id: int, job_id: str) -> None:
+    async def remove_notified(self, guild_id: int, job_id: str, source: str) -> None:
         async with aiosqlite.connect(self.path) as connection:
             await connection.execute(
-                "DELETE FROM notified_jobs WHERE guild_id = ? AND job_id = ?",
-                (guild_id, job_id),
+                """
+                DELETE FROM notified_jobs
+                WHERE guild_id = ? AND job_id = ? AND source = ?
+                """,
+                (guild_id, job_id, source),
             )
             await connection.commit()
 
-    async def get_notified_job_ids(self, guild_id: int) -> set[str]:
+    async def get_notified_keys(self, guild_id: int) -> set[tuple[str, str]]:
+        """Return ``(source, job_id)`` pairs already notified for a guild."""
         async with aiosqlite.connect(self.path) as connection:
             cursor = await connection.execute(
-                "SELECT job_id FROM notified_jobs WHERE guild_id = ?",
+                "SELECT source, job_id FROM notified_jobs WHERE guild_id = ?",
                 (guild_id,),
             )
-            return {row[0] for row in await cursor.fetchall()}
+            return {(row[0], row[1]) for row in await cursor.fetchall()}
 
     async def cleanup_notified_jobs(
         self, hours: float = NOTIFIED_RETENTION_HOURS
