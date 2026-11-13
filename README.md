@@ -1,7 +1,7 @@
 # Job Sniper Discord Bot
 
-Bot multi-servidor para detectar vacantes recientes de LinkedIn y publicarlas
-en un canal de Discord.
+Bot multi-servidor para detectar vacantes recientes de LinkedIn y ChileTrabajos
+y publicarlas en un canal de Discord.
 
 ## Requisitos
 
@@ -79,7 +79,8 @@ Comandos:
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
-  desde una lista. Cada servidor debe conservar al menos uno activo.
+  desde una lista (`linkedin`, `chiletrabajos`). Cada servidor debe conservar
+  al menos uno activo.
 - `/list-portals`: muestra los portales disponibles y los activos.
 - `/list-keywords`: muestra la configuración actual, incluidos los portales.
 - `/status`: muestra latencia, portales y número de avisos enviados.
@@ -101,3 +102,12 @@ descripción como respaldo para términos técnicos.
 
 La API guest de LinkedIn puede aplicar rate limits o modificar su HTML. En
 caso de `429`, el ciclo se omite y el worker continúa ejecutándose.
+
+ChileTrabajos se consulta con las mismas keywords y se puede activar con
+`/add-portal` (por ejemplo `chiletrabajos`). Usa la fecha exacta del aviso para
+respetar la antigüedad configurada, por lo que el primer ciclo puede tardar algo
+más. Revisa hasta 5 páginas de 30 avisos por keyword; para términos de rol
+normalmente basta la primera. Para ese portal conviene priorizar keywords de rol
+(`backend`, `frontend`, `desarrollador`, `programador`, `fullstack`, `devops`,
+`qa`) antes que términos genéricos como `informatica`. Requiere `tzdata` para
+interpretar las fechas de Chile en Windows.

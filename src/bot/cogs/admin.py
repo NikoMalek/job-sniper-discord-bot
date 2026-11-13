@@ -216,7 +216,8 @@ class AdminCog(commands.Cog):
                 "`/add-language` y `/remove-language` — filtra por idioma. "
                 "Por defecto acepta todos los idiomas.\n"
                 "`/add-portal` y `/remove-portal` — activa o desactiva "
-                "portales. LinkedIn está activo por defecto.\n"
+                "portales. LinkedIn está activo por defecto y puedes sumar "
+                "ChileTrabajos.\n"
                 "`/add-blacklist-company` y `/remove-blacklist-company` — "
                 "ignora o vuelve a permitir empresas."
             ),
