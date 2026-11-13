@@ -28,6 +28,7 @@ KEYWORD_ALIASES: dict[str, tuple[str, ...]] = {
     "ingeniera de software": ("software engineer",),
     "frontend": ("front-end", "front end"),
     "backend": ("back-end", "back end"),
+    "fullstack": ("full stack", "full-stack"),
     "devops": ("dev-ops", "dev ops"),
     "informatica": ("informática",),
 }

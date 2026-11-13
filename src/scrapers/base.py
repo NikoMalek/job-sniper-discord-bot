@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +18,7 @@ class Job:
     published_at: str
     company_logo_url: str = ""
     description: str = ""
+    published_at_datetime: datetime | None = None
 
 
 class BaseScraper(ABC):
@@ -41,5 +43,7 @@ class BaseScraper(ABC):
 
         Implementations must guarantee: ``url`` is absolute, ``description``
         may be empty (``""``) when the portal has no text, and ``published_at``
-        is human-readable text (it is displayed verbatim).
+        is human-readable text (it is displayed verbatim). When the portal knows
+        the exact publication moment, it can also set
+        ``published_at_datetime`` so the notification can show a relative time.
         """
