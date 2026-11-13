@@ -42,7 +42,8 @@ class Database:
                     guild_id INTEGER PRIMARY KEY,
                     channel_id INTEGER,
                     location TEXT NOT NULL DEFAULT 'Worldwide',
-                    max_age_hours REAL NOT NULL DEFAULT 24.0
+                    max_age_hours REAL NOT NULL DEFAULT 24.0,
+                    setup_message_sent INTEGER NOT NULL DEFAULT 0
                 );
 
                 CREATE TABLE IF NOT EXISTS guild_keywords (
@@ -99,6 +100,10 @@ class Database:
             if "max_age_hours" not in columns:
                 await connection.execute(
                     "ALTER TABLE guild_configs ADD COLUMN max_age_hours REAL NOT NULL DEFAULT 24.0"
+                )
+            if "setup_message_sent" not in columns:
+                await connection.execute(
+                    "ALTER TABLE guild_configs ADD COLUMN setup_message_sent INTEGER NOT NULL DEFAULT 0"
                 )
             await connection.execute(
                 "UPDATE guild_configs SET max_age_hours = ? WHERE max_age_hours > ?",
@@ -173,6 +178,25 @@ class Database:
                 )
                 """,
                 (guild_id, guild_id),
+            )
+            await connection.commit()
+
+    async def has_setup_message(self, guild_id: int) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT setup_message_sent FROM guild_configs WHERE guild_id = ?",
+                (guild_id,),
+            )
+            row = await cursor.fetchone()
+        return bool(row and row[0])
+
+    async def mark_setup_message_sent(self, guild_id: int) -> None:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            await connection.execute(
+                "UPDATE guild_configs SET setup_message_sent = 1 WHERE guild_id = ?",
+                (guild_id,),
             )
             await connection.commit()
 
