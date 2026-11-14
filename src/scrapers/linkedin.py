@@ -6,8 +6,10 @@ import asyncio
 import logging
 import math
 import random
+import re
 import time
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
@@ -90,6 +92,40 @@ class LinkedInScraper(HttpScraper):
                     return candidate
         return ""
 
+    @staticmethod
+    def _published_datetime(value: str) -> datetime | None:
+        text = " ".join(value.casefold().split())
+        if not text:
+            return None
+        if text in {"just now", "ahora", "hace unos segundos"}:
+            return datetime.now(timezone.utc)
+
+        match = re.search(
+            r"(\d+)\+?\s*"
+            r"(minute|minutes|minuto|minutos|hour|hours|hora|horas|"
+            r"day|days|día|días|week|weeks|semana|semanas|"
+            r"month|months|mes|meses|year|years|año|años)\b",
+            text,
+        )
+        if match is None:
+            return None
+
+        amount = int(match.group(1))
+        unit = match.group(2)
+        if unit in {"minute", "minutes", "minuto", "minutos"}:
+            elapsed = timedelta(minutes=amount)
+        elif unit in {"hour", "hours", "hora", "horas"}:
+            elapsed = timedelta(hours=amount)
+        elif unit in {"day", "days", "día", "días"}:
+            elapsed = timedelta(days=amount)
+        elif unit in {"week", "weeks", "semana", "semanas"}:
+            elapsed = timedelta(weeks=amount)
+        elif unit in {"month", "months", "mes", "meses"}:
+            elapsed = timedelta(days=30 * amount)
+        else:
+            elapsed = timedelta(days=365 * amount)
+        return datetime.now(timezone.utc) - elapsed
+
     def _parse_jobs(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "html.parser")
         jobs: list[Job] = []
@@ -129,6 +165,7 @@ class LinkedInScraper(HttpScraper):
                     published_at=published,
                     company_logo_url=logo_url,
                     description=description,
+                    published_at_datetime=self._published_datetime(published),
                 )
             )
         return jobs
