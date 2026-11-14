@@ -99,6 +99,8 @@ class ChileTrabajosScraper(HttpScraper):
     DEFERRED_TTL_SECONDS = 3 * 60 * 60
     DEFERRED_LIMIT = 200
     DEFERRED_CONTEXT_LIMIT = 50
+    PROXY_MODE = "always"
+    PROXY_HOSTS = ("www.chiletrabajos.cl",)
 
     def __init__(self) -> None:
         self._city_cache: tuple[float, dict[str, str]] | None = None
@@ -665,6 +667,13 @@ class ChileTrabajosScraper(HttpScraper):
             "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
         }
         self._reset_transport_health()
+        proxy_mode = self._proxy_mode()
+        LOGGER.info(
+            "ChileTrabajos transport: %s",
+            f"proxy {self._proxy_base()} ({proxy_mode})"
+            if proxy_mode != "off"
+            else "direct",
+        )
 
         try:
             async with httpx.AsyncClient(

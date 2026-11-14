@@ -39,6 +39,8 @@ class LinkedInScraper(HttpScraper):
     SEARCH_PAGE_DELAY_RANGE = (1.0, 2.0)
     DESCRIPTION_CACHE_TTL_SECONDS = 30 * 60
     DESCRIPTION_CACHE_LIMIT = 500
+    PROXY_MODE = "fallback"
+    PROXY_HOSTS = ("www.linkedin.com", "cl.linkedin.com")
 
     def __init__(self) -> None:
         self._description_cache: dict[str, tuple[float, str]] = {}
@@ -320,6 +322,13 @@ class LinkedInScraper(HttpScraper):
         )
         search_cache_hit = False
         self._reset_transport_health()
+        proxy_mode = self._proxy_mode()
+        LOGGER.info(
+            "LinkedIn transport: %s",
+            f"proxy {self._proxy_base()} ({proxy_mode})"
+            if proxy_mode != "off"
+            else "direct",
+        )
 
         try:
             async with httpx.AsyncClient(
