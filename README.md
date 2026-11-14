@@ -23,6 +23,85 @@ Completa `DISCORD_BOT_TOKEN` en `.env`. `DB_PATH` usa `data/jobs.db` por
 defecto y `CHECK_INTERVAL_MINUTES` usa 5 minutos. `LOG_LEVEL` controla el
 detalle de los logs (`DEBUG`, `INFO`, `WARNING`, `ERROR`); por defecto `INFO`.
 
+## Proxy de portales (Cloudflare Workers)
+
+El bot puede enviar el tráfico de los portales a un Worker de Cloudflare que
+reenvía las peticiones al sitio real. Se usa para dos casos:
+
+- **ChileTrabajos**: Railway no puede conectarse al sitio (timeout a nivel
+  TCP), así que **todo** su tráfico pasa por el Worker.
+- **LinkedIn**: conecta directo y solo usa el Worker **como respaldo** cuando
+  el sitio responde `429` o bloquea la IP de Railway.
+
+Solo se usa el plan **Free** de Cloudflare Workers: 100.000 requests por día,
+sin tarjeta y sin servicios extra (no hace falta KV, D1, R2 ni Pages).
+
+### Modos
+
+| `JOB_PROXY_MODE` | Comportamiento |
+|---|---|
+| vacío (automático) | Cada portal usa su modo por defecto |
+| `off` | Desactiva el proxy para todos los portales |
+| `fallback` | Intenta directo y, si falla, reintenta por el Worker |
+| `always` | Todo el tráfico del portal pasa por el Worker |
+
+| Portal | Modo por defecto |
+|---|---|
+| ChileTrabajos | `always` |
+| LinkedIn | `fallback` |
+
+Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
+Worker valida además su lista `ALLOWED_HOSTS`. Si el Worker no está
+configurado (falta URL o token), todo funciona directo como antes.
+
+### Desplegar el Worker
+
+1. Entra a <https://dash.cloudflare.com> → **Workers & Pages** →
+   **Create application** → **Create Worker**.
+2. Ponle un nombre, por ejemplo `job-sniper-proxy`, y despliega.
+3. Abre **Edit code**, borra el contenido de ejemplo y pega
+   `worker/job-sniper-proxy.js`. Vuelve a desplegar.
+4. En **Settings** → **Variables and Secrets** agrega un **Secret** llamado
+   `PROXY_TOKEN` con un valor largo y aleatorio (por ejemplo
+   `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+5. Opcional: agrega la variable `ALLOWED_HOSTS` con los hosts separados por
+   coma. Por defecto permite `www.chiletrabajos.cl`, `www.linkedin.com` y
+   `cl.linkedin.com`.
+6. Copia la URL del Worker: `https://<nombre>.<subdominio>.workers.dev`.
+
+Para agregar un portal nuevo no hay que tocar el código del Worker: basta con
+sumar su host a `ALLOWED_HOSTS` (y a `PROXY_HOSTS` del scraper en el repo).
+Solo hay que volver a pegar el código si cambia la lógica del Worker; los
+cambios del bot se despliegan por Railway.
+
+### Configurar el bot
+
+```powershell
+JOB_PROXY_URL=https://<nombre>.<subdominio>.workers.dev
+JOB_PROXY_TOKEN=<el mismo valor del Secret>
+JOB_PROXY_MODE=
+```
+
+`JOB_PROXY_MODE` vacío deja el modo automático. La URL del Worker debe apuntar
+a la raíz (sin ruta adicional).
+
+### Probar
+
+```powershell
+# 1. ¿Está desplegado?
+curl.exe -i "https://<nombre>.<subdominio>.workers.dev/__health"
+
+# 2. ¿Responde ChileTrabajos a través del Worker?
+curl.exe -i -H "X-Proxy-Token: <token>" -H "X-Target-Host: www.chiletrabajos.cl" `
+  "https://<nombre>.<subdominio>.workers.dev/encuentra-un-empleo?2=python&fecha=2"
+```
+
+El segundo comando debe devolver `HTTP 200` con HTML del sitio. Si devuelve
+`403`, el token no coincide o el host no está permitido; si devuelve `502`, el
+sitio rechazó la conexión del Worker. En los logs del bot, cada ciclo imprime
+`ChileTrabajos transport: proxy <url> (always)` o
+`LinkedIn transport: proxy <url> (fallback)` según corresponda.
+
 ## Flujo de contribución
 
 Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
