@@ -24,6 +24,23 @@ class HttpScraper(BaseScraper):
     DETAIL_RETRIES = 2
     RETRY_BASE_SECONDS = 3.0
     RETRY_AFTER_CAP = 15.0
+    REQUEST_TIMEOUT_SECONDS = 20.0
+    CONNECT_TIMEOUT_SECONDS = 5.0
+    TRANSPORT_FAILURE_LIMIT = 3
+
+    def _request_timeout(self) -> httpx.Timeout:
+        return httpx.Timeout(
+            self.REQUEST_TIMEOUT_SECONDS,
+            connect=self.CONNECT_TIMEOUT_SECONDS,
+        )
+
+    def _reset_transport_health(self) -> None:
+        """Start a scrape run with a closed circuit breaker."""
+        self._transport_failures = 0
+        self._circuit_open = False
+
+    def _circuit_is_open(self) -> bool:
+        return bool(getattr(self, "_circuit_open", False))
 
     def _retry_delay(self, response: httpx.Response | None, attempt: int) -> float:
         if response is not None:
@@ -51,14 +68,31 @@ class HttpScraper(BaseScraper):
         label: str = "request",
     ) -> httpx.Response | None:
         """Fetch ``url`` retrying rate limits, server errors and network errors."""
+        if self._circuit_is_open():
+            return None
+
         attempts = self.SEARCH_RETRIES if retries is None else retries
         for attempt in range(attempts + 1):
             try:
                 response = await client.get(url, params=params, headers=headers)
-            except httpx.HTTPError as exc:
+            except httpx.TransportError as exc:
+                failures = getattr(self, "_transport_failures", 0) + 1
+                self._transport_failures = failures
+                if failures >= self.TRANSPORT_FAILURE_LIMIT:
+                    if not self._circuit_is_open():
+                        LOGGER.warning(
+                            "%s circuit open after %d consecutive transport "
+                            "failures (last: %r); skipping remaining requests "
+                            "for this run",
+                            self.source,
+                            failures,
+                            exc,
+                        )
+                    self._circuit_open = True
+                    return None
                 if attempt >= attempts:
                     LOGGER.warning(
-                        "%s %s failed after %d attempts: %s",
+                        "%s %s failed after %d attempts: %r",
                         self.source,
                         label,
                         attempt + 1,
@@ -67,7 +101,7 @@ class HttpScraper(BaseScraper):
                     return None
                 delay = self._retry_delay(None, attempt)
                 LOGGER.warning(
-                    "%s %s error: %s; retrying in %.1fs (%d/%d)",
+                    "%s %s error: %r; retrying in %.1fs (%d/%d)",
                     self.source,
                     label,
                     exc,
@@ -77,6 +111,30 @@ class HttpScraper(BaseScraper):
                 )
                 await asyncio.sleep(delay)
                 continue
+            except httpx.HTTPError as exc:
+                if attempt >= attempts:
+                    LOGGER.warning(
+                        "%s %s failed after %d attempts: %r",
+                        self.source,
+                        label,
+                        attempt + 1,
+                        exc,
+                    )
+                    return None
+                delay = self._retry_delay(None, attempt)
+                LOGGER.warning(
+                    "%s %s error: %r; retrying in %.1fs (%d/%d)",
+                    self.source,
+                    label,
+                    exc,
+                    delay,
+                    attempt + 1,
+                    attempts,
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            self._transport_failures = 0
 
             if response.status_code == 429:
                 if attempt >= attempts:
