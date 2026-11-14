@@ -22,6 +22,71 @@ python -m src.main
 Completa `DISCORD_BOT_TOKEN` en `.env`. `DB_PATH` usa `data/jobs.db` por
 defecto y `CHECK_INTERVAL_MINUTES` usa 5 minutos. `LOG_LEVEL` controla el
 detalle de los logs (`DEBUG`, `INFO`, `WARNING`, `ERROR`); por defecto `INFO`.
+Las variables opcionales del proxy (`JOB_PROXY_URL`, `JOB_PROXY_TOKEN` y
+`JOB_PROXY_MODE`) se explican en la sección [Proxy opcional para
+portales](#proxy-opcional-para-portales). Para pruebas locales, usa
+`JOB_PROXY_MODE=off` y deja vacías la URL y el token del proxy.
+
+## Proxy opcional para portales
+
+El proyecto incluye un Worker en
+[`worker/job-sniper-proxy.js`](worker/job-sniper-proxy.js), diseñado para
+desplegarse en Cloudflare Workers y actuar como proxy de salida hacia los
+portales de empleo. Esto permite que una plataforma de despliegue, como
+Railway, pueda consultar sitios a los que no llega directamente o cuya IP
+bloquea las peticiones.
+
+El comportamiento actual es:
+
+- **ChileTrabajos**: usa el Worker siempre cuando el proxy está configurado,
+  porque la plataforma donde se ejecuta el bot puede sufrir timeouts al
+  conectarse directamente.
+- **LinkedIn**: intenta conectarse directamente y usa el Worker como fallback
+  si recibe un bloqueo o un error temporal, como `429`.
+
+El Worker solo reenvía peticiones `GET` hacia los hosts permitidos y requiere
+un token compartido con el bot.
+
+### Modos
+
+| `JOB_PROXY_MODE` | Comportamiento |
+|---|---|
+| vacío (automático) | Cada portal usa su modo por defecto |
+| `off` | Desactiva el proxy para todos los portales |
+| `fallback` | Intenta directo y, si falla, reintenta por el Worker |
+| `always` | Todo el tráfico del portal pasa por el Worker |
+
+| Portal | Modo por defecto |
+|---|---|
+| ChileTrabajos | `always` |
+| LinkedIn | `fallback` |
+
+Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
+Worker valida además su lista `ALLOWED_HOSTS`. Si el Worker no está
+configurado (falta URL o token), todo funciona directo como antes.
+
+### Configurar el bot
+
+```powershell
+JOB_PROXY_URL=https://<nombre>.<subdominio>.workers.dev
+JOB_PROXY_TOKEN=<el mismo valor del Secret>
+JOB_PROXY_MODE=
+```
+
+En un entorno desplegado, por ejemplo Railway, `JOB_PROXY_MODE` vacío deja el
+modo automático por portal. También se puede usar `fallback` o `always` para
+forzar un comportamiento común.
+
+En **local**, donde normalmente la conexión directa sí funciona, por ende se
+debe configurar así:
+
+```powershell
+JOB_PROXY_URL=
+JOB_PROXY_TOKEN=
+JOB_PROXY_MODE=off
+```
+
+Así las pruebas locales nunca pasan por el Worker.
 
 ## Flujo de contribución
 
