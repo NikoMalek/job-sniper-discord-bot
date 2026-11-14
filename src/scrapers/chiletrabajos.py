@@ -95,6 +95,7 @@ class ChileTrabajosScraper(HttpScraper):
     CITY_CACHE_TTL_SECONDS = 6 * 60 * 60
     DETAIL_CACHE_TTL_SECONDS = 6 * 60 * 60
     DETAIL_CACHE_LIMIT = 500
+    SEARCH_CACHE_TTL_SECONDS = 4 * 60
     DEFERRED_TTL_SECONDS = 3 * 60 * 60
     DEFERRED_LIMIT = 200
     DEFERRED_CONTEXT_LIMIT = 50
@@ -102,6 +103,13 @@ class ChileTrabajosScraper(HttpScraper):
     def __init__(self) -> None:
         self._city_cache: tuple[float, dict[str, str]] | None = None
         self._detail_cache: dict[str, tuple[float, Job, datetime]] = {}
+        self._search_cache: dict[
+            tuple[tuple[str, ...], str, int],
+            tuple[float, dict[str, Job], int, int],
+        ] = {}
+        self._search_locks: dict[
+            tuple[tuple[str, ...], str, int], asyncio.Lock
+        ] = {}
         self._deferred: dict[
             tuple[tuple[str, ...], str, int],
             dict[str, tuple[float, Job]],
@@ -487,6 +495,149 @@ class ChileTrabajosScraper(HttpScraper):
                 continue
         return None
 
+    def _prune_search_cache(self, now: float) -> None:
+        for cache_key, value in list(self._search_cache.items()):
+            if value[0] <= now:
+                self._search_cache.pop(cache_key, None)
+
+    async def _search_candidates(
+        self,
+        client: httpx.AsyncClient,
+        terms: list[str],
+        location_id: str,
+        fecha: int,
+    ) -> tuple[dict[str, Job], int, int, bool]:
+        """Fetch the search pages for one keyword/location/date combination."""
+        candidates: dict[str, Job] = {}
+        pages_fetched = 0
+        found_count = 0
+        complete = True
+
+        for keyword in terms:
+            if self._circuit_is_open():
+                LOGGER.warning(
+                    "ChileTrabajos search circuit open; keeping %d jobs from "
+                    "previous keywords",
+                    len(candidates),
+                )
+                complete = False
+                break
+            max_pages = self.MAX_PAGES_PER_KEYWORD
+            for page in range(max_pages):
+                url = (
+                    f"{BASE_URL}{SEARCH_PATH}"
+                    if page == 0
+                    else f"{BASE_URL}{SEARCH_PATH}/{page * self.PAGE_SIZE}"
+                )
+                params: dict[str, str | int] = {
+                    "2": keyword,
+                    "fecha": fecha,
+                }
+                if location_id:
+                    params["13"] = location_id
+
+                response = await self._request_with_retry(
+                    client,
+                    url,
+                    params=params,
+                    retries=self.SEARCH_RETRIES,
+                    label=f"search {keyword!r} page {page + 1}",
+                )
+                if response is None:
+                    LOGGER.warning(
+                        "ChileTrabajos search stopped for %r at page %d",
+                        keyword,
+                        page + 1,
+                    )
+                    complete = False
+                    break
+                if not response.is_success:
+                    LOGGER.warning(
+                        "ChileTrabajos search for %r returned %s on page %d",
+                        keyword,
+                        response.status_code,
+                        page + 1,
+                    )
+                    complete = False
+                    break
+
+                page_jobs = self._parse_cards(response.text)
+                pages_fetched += 1
+                found_count += len(page_jobs)
+
+                if page == 0:
+                    total = self._parse_total(response.text)
+                    if total is not None:
+                        max_pages = min(
+                            max_pages,
+                            max(1, math.ceil(total / self.PAGE_SIZE)),
+                        )
+
+                if not page_jobs:
+                    break
+
+                new_jobs = 0
+                for job in page_jobs:
+                    if job.id in candidates:
+                        continue
+                    candidates[job.id] = job
+                    new_jobs += 1
+
+                if page + 1 >= max_pages:
+                    break
+                if len(page_jobs) < self.PAGE_SIZE:
+                    break
+                if new_jobs == 0:
+                    break
+                await asyncio.sleep(
+                    random.uniform(*self.SEARCH_PAGE_DELAY_RANGE)
+                )
+
+        return candidates, pages_fetched, found_count, complete
+
+    async def _cached_candidates(
+        self,
+        client: httpx.AsyncClient,
+        terms: list[str],
+        location_id: str,
+        fecha: int,
+        context: tuple[tuple[str, ...], str, int],
+    ) -> tuple[dict[str, Job], int, int]:
+        """Share one search across guilds with the same query parameters.
+
+        A per-context lock makes the first caller fetch the pages while the
+        others wait and reuse the result. Only the search phase is shared;
+        each guild still enriches and filters jobs with its own known IDs.
+        """
+        now = time.monotonic()
+        cached = self._search_cache.get(context)
+        if cached is not None and cached[0] > now:
+            return dict(cached[1]), cached[2], cached[3]
+
+        lock = self._search_locks.setdefault(context, asyncio.Lock())
+        async with lock:
+            now = time.monotonic()
+            cached = self._search_cache.get(context)
+            if cached is not None and cached[0] > now:
+                return dict(cached[1]), cached[2], cached[3]
+
+            candidates, pages_fetched, found_count, complete = (
+                await self._search_candidates(
+                    client, terms, location_id, fecha
+                )
+            )
+            # Never cache an aborted search: an empty entry would hide jobs
+            # from other guilds until the TTL expires.
+            if complete:
+                self._prune_search_cache(now)
+                self._search_cache[context] = (
+                    time.monotonic() + self.SEARCH_CACHE_TTL_SECONDS,
+                    candidates,
+                    pages_fetched,
+                    found_count,
+                )
+            return dict(candidates), pages_fetched, found_count
+
     async def fetch_jobs(
         self,
         keywords: list[str],
@@ -513,10 +664,11 @@ class ChileTrabajosScraper(HttpScraper):
             "User-Agent": random.choice(self.user_agents),
             "Accept-Language": "es-CL,es;q=0.9,en;q=0.8",
         }
+        self._reset_transport_health()
 
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(20.0),
+                timeout=self._request_timeout(),
                 follow_redirects=True,
                 headers=headers,
             ) as client:
@@ -531,89 +683,22 @@ class ChileTrabajosScraper(HttpScraper):
                     location_id = self._match_location(
                         location, await self._city_mapping(client)
                     )
-                candidates: dict[str, Job] = {}
-                pages_fetched = 0
-                found_count = 0
-                known_count = 0
-
-                for keyword in terms:
-                    max_pages = self.MAX_PAGES_PER_KEYWORD
-                    for page in range(max_pages):
-                        url = (
-                            f"{BASE_URL}{SEARCH_PATH}"
-                            if page == 0
-                            else f"{BASE_URL}{SEARCH_PATH}/{page * self.PAGE_SIZE}"
-                        )
-                        params: dict[str, str | int] = {
-                            "2": keyword,
-                            "fecha": fecha,
-                        }
-                        if location_id:
-                            params["13"] = location_id
-
-                        response = await self._request_with_retry(
-                            client,
-                            url,
-                            params=params,
-                            retries=self.SEARCH_RETRIES,
-                            label=f"search {keyword!r} page {page + 1}",
-                        )
-                        if response is None:
-                            LOGGER.warning(
-                                "ChileTrabajos search stopped for %r at page %d",
-                                keyword,
-                                page + 1,
-                            )
-                            break
-                        if not response.is_success:
-                            LOGGER.warning(
-                                "ChileTrabajos search for %r returned %s on page %d",
-                                keyword,
-                                response.status_code,
-                                page + 1,
-                            )
-                            break
-
-                        page_jobs = self._parse_cards(response.text)
-                        pages_fetched += 1
-                        found_count += len(page_jobs)
-
-                        if page == 0:
-                            total = self._parse_total(response.text)
-                            if total is not None:
-                                max_pages = min(
-                                    max_pages,
-                                    max(1, math.ceil(total / self.PAGE_SIZE)),
-                                )
-
-                        if not page_jobs:
-                            break
-
-                        new_jobs = 0
-                        for job in page_jobs:
-                            if job.id in candidates:
-                                continue
-                            candidates[job.id] = job
-                            new_jobs += 1
-                            if job.id in known:
-                                known_count += 1
-
-                        if page + 1 >= max_pages:
-                            break
-                        if len(page_jobs) < self.PAGE_SIZE:
-                            break
-                        if new_jobs == 0:
-                            break
-                        await asyncio.sleep(
-                            random.uniform(*self.SEARCH_PAGE_DELAY_RANGE)
-                        )
-
-                now = time.monotonic()
                 context = (
                     tuple(sorted(self._normalize(term) for term in terms)),
                     location_id,
                     fecha,
                 )
+                candidates, pages_fetched, found_count = (
+                    await self._cached_candidates(
+                        client,
+                        terms,
+                        location_id,
+                        fecha,
+                        context,
+                    )
+                )
+                known_count = sum(1 for job_id in candidates if job_id in known)
+                now = time.monotonic()
                 deferred_items = self._deferred.get(context, {})
                 deferred = [
                     (expires_at, job)
@@ -638,6 +723,10 @@ class ChileTrabajosScraper(HttpScraper):
                 pending_ids = list(pending)
 
                 for index, job_id in enumerate(pending_ids):
+                    if self._circuit_is_open():
+                        for deferred_id in pending_ids[index:]:
+                            remaining[deferred_id] = pending[deferred_id]
+                        break
                     if fetched_count >= self.MAX_DETAILS_PER_CYCLE:
                         for deferred_id in pending_ids[index:]:
                             remaining[deferred_id] = pending[deferred_id]

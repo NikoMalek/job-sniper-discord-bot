@@ -44,7 +44,10 @@ class LinkedInScraper(HttpScraper):
         self._description_cache: dict[str, tuple[float, str]] = {}
         self._search_cache: dict[
             tuple[tuple[str, ...], str, float],
-            tuple[dict[str, Job], int, int],
+            tuple[dict[str, Job], int, int, bool],
+        ] = {}
+        self._search_locks: dict[
+            tuple[tuple[str, ...], str, float], asyncio.Lock
         ] = {}
 
     def begin_cycle(self) -> None:
@@ -206,6 +209,83 @@ class LinkedInScraper(HttpScraper):
             return None
         return self._parse_description(response.text)
 
+    async def _search_jobs(
+        self,
+        client: httpx.AsyncClient,
+        params: dict[str, str | int],
+        headers: dict[str, str],
+    ) -> tuple[dict[str, Job], int, int, bool]:
+        """Fetch every search page once for a given keyword/location/age set."""
+        search_params = dict(params)
+        cards: dict[str, Job] = {}
+        pages_fetched = 0
+        found_count = 0
+        complete = True
+
+        for page in range(self.MAX_SEARCH_PAGES):
+            if self._circuit_is_open():
+                LOGGER.warning(
+                    "LinkedIn search circuit open at page %d; keeping %d jobs "
+                    "from previous pages",
+                    page + 1,
+                    len(cards),
+                )
+                complete = False
+                break
+            search_params["start"] = page * 10
+            response = await self._request_with_retry(
+                client,
+                self.endpoint,
+                params=search_params,
+                headers=headers,
+                retries=self.SEARCH_RETRIES,
+                label=f"search page {page + 1}",
+            )
+            if response is None:
+                LOGGER.warning(
+                    "LinkedIn search stopped at page %d; keeping %d jobs "
+                    "from previous pages",
+                    page + 1,
+                    len(cards),
+                )
+                complete = False
+                break
+            if self._is_authwall(response):
+                LOGGER.warning(
+                    "LinkedIn search authwall on page %d; stopping", page + 1
+                )
+                complete = False
+                break
+            if not response.is_success:
+                LOGGER.warning(
+                    "LinkedIn search returned %s on page %d; stopping",
+                    response.status_code,
+                    page + 1,
+                )
+                complete = False
+                break
+
+            page_jobs = self._parse_jobs(response.text)
+            pages_fetched += 1
+            found_count += len(page_jobs)
+            if not page_jobs:
+                break
+
+            new_jobs = 0
+            for job in page_jobs:
+                if job.id not in cards:
+                    cards[job.id] = job
+                    new_jobs += 1
+
+            if new_jobs == 0:
+                break
+            if page + 1 < self.MAX_SEARCH_PAGES:
+                await asyncio.sleep(
+                    random.uniform(*self.SEARCH_PAGE_DELAY_RANGE)
+                )
+
+        return cards, pages_fetched, found_count, complete
+
     async def fetch_jobs(
         self,
         keywords: list[str],
@@ -239,76 +319,33 @@ class LinkedInScraper(HttpScraper):
             max_age_hours,
         )
         search_cache_hit = False
+        self._reset_transport_health()
 
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(20.0), follow_redirects=True
+                timeout=self._request_timeout(), follow_redirects=True
             ) as client:
                 cached_search = self._search_cache.get(cache_key)
                 if cached_search is not None:
                     search_cache_hit = True
-                    cards, pages_fetched, found_count = cached_search
                 else:
-                    cards: dict[str, Job] = {}
-                    pages_fetched = 0
-                    found_count = 0
-
-                    for page in range(self.MAX_SEARCH_PAGES):
-                        params["start"] = page * 10
-                        response = await self._request_with_retry(
-                            client,
-                            self.endpoint,
-                            params=params,
-                            headers=headers,
-                            retries=self.SEARCH_RETRIES,
-                            label=f"search page {page + 1}",
-                        )
-                        if response is None:
-                            LOGGER.warning(
-                                "LinkedIn search stopped at page %d; keeping %d jobs "
-                                "from previous pages",
-                                page + 1,
-                                len(cards),
-                            )
-                            break
-                        if self._is_authwall(response):
-                            LOGGER.warning(
-                                "LinkedIn search authwall on page %d; stopping", page + 1
-                            )
-                            break
-                        if not response.is_success:
-                            LOGGER.warning(
-                                "LinkedIn search returned %s on page %d; stopping",
-                                response.status_code,
-                                page + 1,
-                            )
-                            break
-
-                        page_jobs = self._parse_jobs(response.text)
-                        pages_fetched += 1
-                        found_count += len(page_jobs)
-                        if not page_jobs:
-                            break
-
-                        new_jobs = 0
-                        for job in page_jobs:
-                            if job.id not in cards:
-                                cards[job.id] = job
-                                new_jobs += 1
-
-                        if new_jobs == 0:
-                            break
-                        if page + 1 < self.MAX_SEARCH_PAGES:
-                            await asyncio.sleep(
-                                random.uniform(*self.SEARCH_PAGE_DELAY_RANGE)
-                            )
-
-                    self._search_cache[cache_key] = (
-                        cards,
-                        pages_fetched,
-                        found_count,
+                    lock = self._search_locks.setdefault(
+                        cache_key, asyncio.Lock()
                     )
-
+                    async with lock:
+                        cached_search = self._search_cache.get(cache_key)
+                        if cached_search is not None:
+                            search_cache_hit = True
+                        else:
+                            cached_search = await self._search_jobs(
+                                client, params, headers
+                            )
+                            # Never cache an aborted search: an empty entry
+                            # would hide jobs from other guilds until the
+                            # next cycle.
+                            if cached_search[3]:
+                                self._search_cache[cache_key] = cached_search
+                cards, pages_fetched, found_count, _ = cached_search
                 job_cards = list(cards.values())
                 enriched: list[Job] = []
                 known_count = 0
@@ -320,6 +357,10 @@ class LinkedInScraper(HttpScraper):
                 for job in job_cards:
                     if job.id in known:
                         known_count += 1
+                        continue
+
+                    if self._circuit_is_open():
+                        deferred_count += 1
                         continue
 
                     cached_description = self._cached_description(job.id)
