@@ -19,7 +19,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import httpx
 from bs4 import BeautifulSoup
 
-from .base import Job
+from ..locations import CHILE_CITIES, LocationIntent, normalize
+from .base import Job, PortalPlan
 from .http import HttpScraper
 
 LOGGER = logging.getLogger(__name__)
@@ -52,32 +53,22 @@ _MONTH_ABBREVIATIONS = (
 
 # Fallback used when the search form cannot be downloaded. The scraper
 # refreshes the full list from the site every few hours.
-_STATIC_CITIES = {
-    "antofagasta": "1004",
-    "arica": "1000",
-    "chillan": "1036",
-    "concepcion": "1035",
-    "copiapo": "1007",
-    "curico": "1032",
-    "iquique": "1002",
-    "la serena": "1010",
-    "los angeles": "1037",
-    "puerto montt": "1043",
-    "punta arenas": "1051",
-    "rancagua": "1028",
-    "santiago": "1022",
-    "talca": "1031",
-    "temuco": "1039",
-    "valdivia": "1041",
-    "valparaiso": "1014",
-}
+_STATIC_CITIES = {normalize(city.name): city.bucket for city in CHILE_CITIES}
 
-_REMOTE_PREFIXES = ("anywhere", "remote", "remoto", "todo chile", "worldwide")
+_REMOTE_PREFIXES = (
+    "anywhere",
+    "remote",
+    "remoto",
+    "todo chile",
+    "todo el mundo",
+    "worldwide",
+)
 
 
 class ChileTrabajosScraper(HttpScraper):
     slug = "chiletrabajos"
     source = "ChileTrabajos"
+    COVERED_COUNTRIES = frozenset({"CL"})
     user_agents = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/131.0 Safari/537.36",
@@ -116,6 +107,47 @@ class ChileTrabajosScraper(HttpScraper):
             tuple[tuple[str, ...], str, int],
             dict[str, tuple[float, Job]],
         ] = {}
+
+    def plan(self, intent: LocationIntent) -> PortalPlan:
+        if not self.covers(intent):
+            return PortalPlan(False, reason=self.pause_reason(intent))
+        if intent.kind in {"worldwide", "remote"}:
+            if intent.country is None:
+                return PortalPlan(
+                    True,
+                    "Chile",
+                    note=(
+                        "solo puede buscar ofertas en Chile y no tiene filtro "
+                        "de modalidad."
+                    ),
+                )
+            return PortalPlan(
+                True,
+                "Chile",
+                note=(
+                    "no tiene filtro remoto; se buscan todas las ofertas "
+                    "de Chile."
+                ),
+            )
+        if intent.kind == "country":
+            return PortalPlan(True, "Chile")
+        if intent.chile_bucket:
+            note = ""
+            if intent.city_alias:
+                note = (
+                    f"no tiene una opción para {intent.city}; se usa "
+                    f"{intent.chile_bucket_city} como equivalente."
+                )
+            return PortalPlan(True, intent.chile_bucket_city, note=note)
+        return PortalPlan(
+            True,
+            "Chile",
+            note=(
+                f"no tiene una opción para {intent.city}; se buscará en "
+                "todo Chile. Puedes acotar con `/add-location` en ciudades "
+                "cercanas."
+            ),
+        )
 
     @staticmethod
     def _normalize(value: str) -> str:
@@ -389,14 +421,20 @@ class ChileTrabajosScraper(HttpScraper):
         normalized = cls._normalize(location)
         if not normalized:
             return ""
-        if normalized == "chile" or normalized.startswith(_REMOTE_PREFIXES):
-            return ""
         if normalized in mapping:
             return mapping[normalized]
-        for segment in normalized.split(","):
-            segment = segment.strip()
+        segments = [
+            segment.strip()
+            for segment in normalized.split(",")
+            if segment.strip()
+        ]
+        for segment in segments:
             if segment in mapping:
                 return mapping[segment]
+
+        if normalized == "chile" or normalized.startswith(_REMOTE_PREFIXES):
+            return ""
+        for segment in segments:
             if segment == "chile" or segment.startswith(_REMOTE_PREFIXES):
                 return ""
 

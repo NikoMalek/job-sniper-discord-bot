@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .base import BaseScraper, Job
+from .base import BaseScraper, Job, PortalPlan
 from .chiletrabajos import ChileTrabajosScraper
 from .http import HttpScraper
 from .linkedin import LinkedInScraper
@@ -33,6 +33,7 @@ __all__ = [
     "HttpScraper",
     "Job",
     "LinkedInScraper",
+    "PortalPlan",
     "get_scraper",
     "portal_names",
 ]
