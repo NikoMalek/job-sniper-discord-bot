@@ -131,7 +131,11 @@ Comandos:
 - `/help`: muestra los pasos iniciales, la configuración avanzada y los
   comandos para consultar el estado del bot.
 - `/set-channel`: selecciona el canal de avisos.
-- `/set-location`: define una ciudad, país o ubicación como `Remote`.
+- `/set-location`: reemplaza tus ubicaciones por una sola, usando el formato
+  estándar (ver [Ubicaciones](#ubicaciones)).
+- `/add-location` y `/remove-location`: agrega o quita ubicaciones. Se pueden
+  guardar hasta 3 y se combinan con lógica OR. Si quitas la última, se
+  restablece `Worldwide` automáticamente.
 - `/set-max-age`: define cuántas horas hacia atrás buscar, desde 10 minutos
   (0.1667 horas) hasta 24 horas. Por ejemplo `0.5` son 30 minutos.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
@@ -145,16 +149,76 @@ Comandos:
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
   desde una lista (`linkedin`, `chiletrabajos`). Cada servidor debe conservar
-  al menos uno activo.
-- `/list-portals`: muestra los portales disponibles y los activos.
-- `/list-keywords`: muestra la configuración actual, incluidos los portales.
-- `/status`: muestra latencia, portales y número de avisos enviados.
+  al menos uno activo. `/add-portal` rechaza un portal incompatible con las
+  ubicaciones actuales y explica cómo corregirlo.
+- `/list-portals`: muestra cada portal como `activo (✅)` o `pausado(⏸️)`, con la
+  búsqueda resultante y su cobertura.
+- `/list-locations`: muestra las ubicaciones actuales, cómo se traducen en
+  cada portal, los formatos aceptados, las 58 ciudades chilenas y las
+  equivalencias.
+- `/list-keywords`: muestra la configuración actual, incluidas las ubicaciones,
+  los portales y su estado.
+- `/status`: muestra latencia, portales (con su estado) y número de avisos
+  enviados.
 
-Cada servidor tiene su propia ubicación, canal, keywords, portales e historial de
-vacantes notificadas. El bot consulta las ofertas publicadas durante las
-últimas 24 horas y evita reenviar la misma vacante del mismo portal. El
-historial de avisos se purga automáticamente después de 25 horas para no llenar
-la base de datos.
+## Ubicaciones
+
+`/set-location` y `/add-location` aceptan un formato estándar:
+
+| Formato | Ejemplo | Alcance |
+|---|---|---|
+| `Worldwide` | `Worldwide` | Cualquier modalidad, sin filtro geográfico |
+| `Remoto` | `Remoto` | Solo ofertas remotas en todo el mundo |
+| `Remoto, país` | `Remoto, Chile` | Remoto en un país |
+| `País` | `Chile`, `España` | Todo el país |
+| `Ciudad, país` | `Santiago, Chile` | Esa ciudad |
+
+`Worldwide` es la ubicación por defecto: busca ofertas de cualquier modalidad
+en todos los países, y cada portal aporta lo que puede. También se aceptan
+`Todo el mundo`, `Global`, `Anywhere` y `Cualquier lugar` como alias.
+
+- Se pueden guardar hasta **3** ubicaciones y se combinan con lógica **OR**.
+- También se acepta una ciudad chilena sola (`Santiago`): se completa como
+  `Santiago, Chile`, pero el formato recomendado es `ciudad, país`.
+- Si el país no se reconoce (por ejemplo `Narnia`) o la modalidad no es válida
+  (por ejemplo `online`), el bot pide corregirla y sugiere usar un país real,
+  `Remoto` o `Worldwide`.
+- Cada portal tiene su propia cobertura. Si **todas** las ubicaciones quedan
+  fuera de la cobertura de un portal, ese portal queda **pausado (⏸️)** y se
+  reactiva solo al volver a una ubicación compatible. `/list-portals`,
+  `/list-keywords`, `/status` y `/list-locations` muestran ese estado.
+- Por ejemplo, ChileTrabajos solo cubre Chile. Además ofrece 58 ciudades: si
+  escribes una ciudad chilena que no está en esa lista, se busca todo Chile y
+  se avisa; si hay una equivalencia (por ejemplo `Viña del Mar` →
+  `Valparaíso`, `Providencia` → `Santiago`), se usa el bucket correspondiente
+  y también se avisa.
+- LinkedIn usa el nombre del país en inglés por dentro, pero el bot conserva y
+  muestra lo que escribiste.
+
+### Datos de países y ciudades
+
+Los datos editables viven en JSON; no hace falta tocar Python para agregar
+países, alias o equivalencias de ciudades:
+
+- `src/data/countries.json`
+  - `countries`: lista de `{ "code", "name_es", "name_en" }`.
+  - `aliases`: pares `"texto que escribe el usuario": "CÓDIGO"`. Se normalizan
+    mayúsculas y acentos, así que `"EE.UU."` o `"eeuu"` funcionan igual.
+- `src/data/chiletrabajos_cities.json`
+  - Lista de `{ "name", "bucket", "region", "aliases" }`.
+  - `bucket` es el valor que usa ChileTrabajos para esa ciudad.
+  - `aliases` agrega equivalencias, por ejemplo `"Viña del Mar"` dentro de
+    `Valparaíso`.
+
+Después de editar un JSON, reinicia el bot para que tome los cambios. Si el
+JSON tiene un error (por ejemplo, un alias apunta a un país inexistente), el
+bot falla al iniciar indicando el problema.
+
+Cada servidor tiene sus propias ubicaciones, canal, keywords, portales e
+historial de vacantes notificadas. El bot consulta las ofertas publicadas
+durante las últimas 24 horas y evita reenviar la misma vacante del mismo
+portal. El historial de avisos se purga automáticamente después de 25 horas
+para no llenar la base de datos.
 
 Si una misma vacante aparece en varios portales dentro del mismo ciclo, se envía
 un solo mensaje con un link por portal. Si aparece en otro portal en un ciclo

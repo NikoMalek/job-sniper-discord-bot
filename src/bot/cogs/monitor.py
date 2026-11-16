@@ -12,8 +12,13 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands, tasks
 
-from ...database import NOTIFIED_RETENTION_HOURS, GuildMonitorConfig
+from ...database import (
+    DEFAULT_LOCATION,
+    NOTIFIED_RETENTION_HOURS,
+    GuildMonitorConfig,
+)
 from ...dedupe import group_jobs
+from ...locations import LocationError, parse_location
 from ...notifier import send_jobs
 from ...scrapers import SCRAPERS, BaseScraper, Job, get_scraper
 from lingua import Language, LanguageDetectorBuilder
@@ -250,25 +255,88 @@ class MonitorCog(commands.Cog):
             }
             started = time.monotonic()
             LOGGER.info(
-                "Portal %s starting for guild %s (known=%d)",
+                "Portal %s starting for guild %s (known=%d, locations=%d)",
                 scraper.source,
                 config.guild_id,
                 len(known),
+                len(config.locations),
             )
-            jobs = await scraper.fetch_jobs(
-                config.keywords,
-                config.location,
-                config.max_age_hours,
-                known_job_ids=known,
-            )
+
+            intents = []
+            for value in config.locations or (DEFAULT_LOCATION,):
+                try:
+                    intents.append(parse_location(value))
+                except LocationError:
+                    LOGGER.warning(
+                        "Guild %s has an invalid location %r; skipping it",
+                        config.guild_id,
+                        value,
+                    )
+
+            plans = []
+            seen_locations: set[str] = set()
+            for intent in intents:
+                plan = scraper.plan(intent)
+                if not plan.supported:
+                    LOGGER.info(
+                        "Portal %s paused for guild %s: %s",
+                        scraper.source,
+                        config.guild_id,
+                        plan.reason,
+                    )
+                    continue
+                if plan.search_location in seen_locations:
+                    continue
+                seen_locations.add(plan.search_location)
+                plans.append(plan)
+
+            if not plans:
+                LOGGER.warning(
+                    "Portal %s has no compatible location for guild %s "
+                    "(locations=%s)",
+                    scraper.source,
+                    config.guild_id,
+                    ", ".join(config.locations) or DEFAULT_LOCATION,
+                )
+                return
+
+            jobs: dict[tuple[str, str], Job] = {}
+            for plan in plans:
+                try:
+                    found = await scraper.fetch_jobs(
+                        config.keywords,
+                        plan.search_location,
+                        config.max_age_hours,
+                        known_job_ids=known,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    LOGGER.exception(
+                        "Portal %s failed for guild %s at location %r",
+                        scraper.source,
+                        config.guild_id,
+                        plan.search_location,
+                    )
+                    continue
+                for job in found:
+                    jobs[(job.source, job.id)] = job
+                LOGGER.info(
+                    "Portal %s location %r returned %d jobs for guild %s",
+                    scraper.source,
+                    plan.search_location,
+                    len(found),
+                    config.guild_id,
+                )
+
             LOGGER.info(
-                "Portal %s returned %d jobs for guild %s in %.1fs",
+                "Portal %s returned %d unique jobs for guild %s in %.1fs",
                 scraper.source,
                 len(jobs),
                 config.guild_id,
                 time.monotonic() - started,
             )
-            self._enqueue_results(config, jobs)
+            self._enqueue_results(config, list(jobs.values()))
         except asyncio.CancelledError:
             raise
         except Exception:

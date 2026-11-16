@@ -15,7 +15,8 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 import httpx
 from bs4 import BeautifulSoup
 
-from .base import Job
+from ..locations import LocationIntent
+from .base import Job, PortalPlan
 from .http import HttpScraper
 
 LOGGER = logging.getLogger(__name__)
@@ -56,6 +57,40 @@ class LinkedInScraper(HttpScraper):
 
     def begin_cycle(self) -> None:
         self._search_cache.clear()
+
+    def plan(self, intent: LocationIntent) -> PortalPlan:
+        if intent.kind == "worldwide":
+            return PortalPlan(
+                True,
+                "Worldwide",
+                note=(
+                    "sin filtro de modalidad: incluye ofertas remotas y "
+                    "presenciales de todo el mundo."
+                ),
+            )
+        if intent.kind == "remote":
+            if intent.country is None:
+                return PortalPlan(
+                    True,
+                    "Remote",
+                    note="solo ofertas remotas de todo el mundo.",
+                )
+            return PortalPlan(
+                True,
+                intent.country.name_en,
+                note=(
+                    "LinkedIn no permite filtrar solo remoto; se buscará "
+                    "todo el país."
+                ),
+            )
+        if intent.kind == "country" and intent.country is not None:
+            return PortalPlan(True, intent.country.name_en)
+        country = intent.country
+        if country is None:
+            return PortalPlan(True, intent.city)
+        if intent.city.casefold().endswith(f"de {country.name_en}".casefold()):
+            return PortalPlan(True, intent.city)
+        return PortalPlan(True, f"{intent.city}, {country.name_en}")
 
     @staticmethod
     def _clean_url(url: str) -> str:
