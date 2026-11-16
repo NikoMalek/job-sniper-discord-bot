@@ -27,9 +27,24 @@ def build_setup_embed() -> discord.Embed:
         name="🚀 Primeros Pasos",
         value=(
             "1. Configura el canal de avisos: `/set-channel`\n"
-            "2. Define tu país o ciudad: `/set-location` "
-            "(por defecto: `Worldwide`)\n"
+            "2. Define tu ubicación: `/set-location` (por defecto: Worldwide)\n"
             "3. Agrega términos para buscar: `/add-keyword`"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="📍 Ubicación",
+        value=(
+            "Usa uno de estos formatos:\n"
+            "• `Worldwide` — cualquier modalidad, sin filtro geográfico\n"
+            "• `Remoto` — solo ofertas remotas en todo el mundo\n"
+            "• `Remoto, país` — ej. `Remoto, Chile`\n"
+            "• `País` — ej. `Chile`, `España`\n"
+            "• `Ciudad, país` — ej. `Santiago, Chile`\n\n"
+            "Puedes guardar hasta **3** ubicaciones con `/add-location`.\n"
+            "Algunos portales solo cubren ciertos países: si filtras por una "
+            "ubicación fuera de su cobertura, el portal queda en pausa y se "
+            "reactiva solo cuando uses una ubicación compatible."
         ),
         inline=False,
     )
@@ -38,7 +53,7 @@ def build_setup_embed() -> discord.Embed:
         value=(
             "Por defecto busca ofertas de las últimas **24 horas** en "
             "**LinkedIn** y acepta todos los idiomas.\n"
-            "Puedes activar otros portales como **ChileTrabajos** con "
+            "Puedes activar otros portales con "
             "`/add-portal`. Para ajustar la antigüedad, empresas ignoradas, "
             "idiomas y portales, usa `/help`."
         ),

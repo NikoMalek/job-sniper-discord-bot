@@ -11,18 +11,24 @@ import aiosqlite
 MIN_MAX_AGE_HOURS = 10 / 60
 MAX_MAX_AGE_HOURS = 24.0
 NOTIFIED_RETENTION_HOURS = MAX_MAX_AGE_HOURS + 1.0
+DEFAULT_LOCATION = "Worldwide"
 
 
 @dataclass(frozen=True, slots=True)
 class GuildMonitorConfig:
     guild_id: int
     channel_id: int | None
-    location: str
+    locations: tuple[str, ...]
     keywords: list[str]
     blacklisted_companies: list[str]
     languages: list[str]
     max_age_hours: float
     portals: tuple[str, ...]
+
+    @property
+    def location(self) -> str:
+        """First configured location, or the implicit default."""
+        return self.locations[0] if self.locations else DEFAULT_LOCATION
 
 
 class Database:
@@ -41,7 +47,7 @@ class Database:
                 CREATE TABLE IF NOT EXISTS guild_configs (
                     guild_id INTEGER PRIMARY KEY,
                     channel_id INTEGER,
-                    location TEXT NOT NULL DEFAULT 'Worldwide',
+                    location TEXT NOT NULL DEFAULT '',
                     max_age_hours REAL NOT NULL DEFAULT 24.0,
                     setup_message_sent INTEGER NOT NULL DEFAULT 0
                 );
@@ -77,6 +83,16 @@ class Database:
                     guild_id INTEGER NOT NULL,
                     source TEXT NOT NULL,
                     UNIQUE (guild_id, source),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS guild_locations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    position INTEGER NOT NULL,
+                    location TEXT NOT NULL,
+                    UNIQUE (guild_id, location),
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
@@ -150,6 +166,25 @@ class Database:
                 WHERE guild_id NOT IN (SELECT guild_id FROM guild_portals)
                 """
             )
+            # Migrate the single ``location`` column into the new list table.
+            await connection.execute(
+                """
+                INSERT OR IGNORE INTO guild_locations (guild_id, position, location)
+                SELECT guild_id, 0, location FROM guild_configs
+                WHERE guild_id NOT IN (SELECT guild_id FROM guild_locations)
+                  AND location <> ''
+                """
+            )
+            # Canonical label for "any modality, any country" is "Worldwide";
+            # normalize the temporary Spanish label if it was ever stored.
+            await connection.execute(
+                "UPDATE OR IGNORE guild_configs SET location = 'Worldwide' "
+                "WHERE location = 'Todo el mundo'"
+            )
+            await connection.execute(
+                "UPDATE OR IGNORE guild_locations SET location = 'Worldwide' "
+                "WHERE location = 'Todo el mundo'"
+            )
             await connection.commit()
 
     @staticmethod
@@ -210,13 +245,102 @@ class Database:
             await connection.commit()
 
     async def set_location(self, guild_id: int, location: str) -> None:
+        """Replace every configured location with a single one."""
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
             await connection.execute(
                 "UPDATE guild_configs SET location = ? WHERE guild_id = ?",
                 (location, guild_id),
             )
+            await connection.execute(
+                "DELETE FROM guild_locations WHERE guild_id = ?", (guild_id,)
+            )
+            await connection.execute(
+                """
+                INSERT INTO guild_locations (guild_id, position, location)
+                VALUES (?, 0, ?)
+                """,
+                (guild_id, location),
+            )
             await connection.commit()
+
+    async def get_locations(self, guild_id: int) -> list[str]:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT location FROM guild_locations
+                WHERE guild_id = ? ORDER BY position, id
+                """,
+                (guild_id,),
+            )
+            return [row[0] for row in await cursor.fetchall()]
+
+    async def add_location(self, guild_id: int, location: str) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT COALESCE(MAX(position), -1) + 1
+                FROM guild_locations WHERE guild_id = ?
+                """,
+                (guild_id,),
+            )
+            row = await cursor.fetchone()
+            position = int(row[0]) if row else 0
+            cursor = await connection.execute(
+                """
+                INSERT OR IGNORE INTO guild_locations
+                    (guild_id, position, location)
+                VALUES (?, ?, ?)
+                """,
+                (guild_id, position, location),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
+    async def remove_location(self, guild_id: int, location: str) -> bool:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                DELETE FROM guild_locations
+                WHERE guild_id = ? AND location = ?
+                """,
+                (guild_id, location),
+            )
+            removed = cursor.rowcount == 1
+            if removed:
+                rows = await (
+                    await connection.execute(
+                        """
+                        SELECT id FROM guild_locations
+                        WHERE guild_id = ? ORDER BY position, id
+                        """,
+                        (guild_id,),
+                    )
+                ).fetchall()
+                for index, row in enumerate(rows):
+                    await connection.execute(
+                        "UPDATE guild_locations SET position = ? WHERE id = ?",
+                        (index, row[0]),
+                    )
+                first = await (
+                    await connection.execute(
+                        """
+                        SELECT location FROM guild_locations
+                        WHERE guild_id = ? ORDER BY position, id LIMIT 1
+                        """,
+                        (guild_id,),
+                    )
+                ).fetchone()
+                # An empty list is valid: the monitor falls back to
+                # DEFAULT_LOCATION without counting it as a saved location.
+                await connection.execute(
+                    "UPDATE guild_configs SET location = ? WHERE guild_id = ?",
+                    (first[0] if first is not None else "", guild_id),
+                )
+            await connection.commit()
+            return removed
 
     async def set_max_age_hours(self, guild_id: int, max_age_hours: float) -> None:
         await self._ensure_guild(guild_id)
@@ -367,12 +491,20 @@ class Database:
                 (guild_id,),
             )
             portals = tuple(row["source"] for row in await portal_cursor.fetchall())
+            location_cursor = await connection.execute(
+                """
+                SELECT location FROM guild_locations
+                WHERE guild_id = ? ORDER BY position, id
+                """,
+                (guild_id,),
+            )
+            locations = tuple(row["location"] for row in await location_cursor.fetchall())
         if config is None:
             raise RuntimeError(f"Guild configuration was not created: {guild_id}")
         return GuildMonitorConfig(
             guild_id=config["guild_id"],
             channel_id=config["channel_id"],
-            location=config["location"],
+            locations=locations,
             keywords=keywords,
             blacklisted_companies=blacklisted_companies,
             languages=languages,
@@ -419,12 +551,22 @@ class Database:
                     (config["guild_id"],),
                 )
                 portals = tuple(row["source"] for row in await portal_cursor.fetchall())
+                location_cursor = await connection.execute(
+                    """
+                    SELECT location FROM guild_locations
+                    WHERE guild_id = ? ORDER BY position, id
+                    """,
+                    (config["guild_id"],),
+                )
+                locations = tuple(
+                    row["location"] for row in await location_cursor.fetchall()
+                )
                 if keywords:
                     result.append(
                         GuildMonitorConfig(
                             guild_id=config["guild_id"],
                             channel_id=config["channel_id"],
-                            location=config["location"],
+                            locations=locations,
                             keywords=keywords,
                             blacklisted_companies=blacklisted_companies,
                             languages=languages,

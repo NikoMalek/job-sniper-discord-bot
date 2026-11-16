@@ -8,8 +8,23 @@ from discord import app_commands
 from discord.ext import commands
 from typing import TYPE_CHECKING
 
-from ...database import MAX_MAX_AGE_HOURS, MIN_MAX_AGE_HOURS, Database
+from ...countries import COUNTRIES_BY_CODE
+from ...database import (
+    DEFAULT_LOCATION,
+    MAX_MAX_AGE_HOURS,
+    MIN_MAX_AGE_HOURS,
+    Database,
+)
 from ...languages import LANGUAGE_LABELS, SUPPORTED_LANGUAGES, parse_languages
+from ...locations import (
+    LOCATION_FORMAT_HELP,
+    MAX_LOCATIONS,
+    LocationError,
+    LocationIntent,
+    normalize,
+    parse_location,
+    parse_location_or_none,
+)
 from ...scrapers import SCRAPERS, portal_names
 
 if TYPE_CHECKING:
@@ -25,6 +40,13 @@ LANGUAGE_CHOICES = [
     app_commands.Choice(name=f"{label.title()} ({language})", value=language)
     for language, label in LANGUAGE_LABELS.items()
 ]
+PAUSE_HELP = (
+    "**Cobertura y pausa**\n"
+    "Cada portal tiene su propia cobertura. Si **todas** tus ubicaciones "
+    "quedan fuera de la cobertura de un portal, ese portal queda "
+    "**pausado (⏸️)** y se reactiva automáticamente cuando vuelvas a una "
+    "ubicación compatible."
+)
 
 
 class AdminCog(commands.Cog):
@@ -48,6 +70,105 @@ class AdminCog(commands.Cog):
         label = f"{whole_hours} hora{'s' if whole_hours != 1 else ''}"
         return f"{label} {minutes} min" if minutes else label
 
+    @staticmethod
+    def _intents(locations) -> list[LocationIntent]:
+        intents: list[LocationIntent] = []
+        for value in tuple(locations) or (DEFAULT_LOCATION,):
+            intent = parse_location_or_none(value)
+            if intent is not None:
+                intents.append(intent)
+        return intents
+
+    @staticmethod
+    def _location_key(value: str) -> str:
+        intent = parse_location_or_none(value)
+        return normalize(intent.label if intent is not None else value)
+
+    @staticmethod
+    def _scraper_plans(
+        scraper, intents: list[LocationIntent]
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Return searches, notes and pause reasons for one portal."""
+        searches: list[str] = []
+        notes: list[str] = []
+        reasons: list[str] = []
+        for intent in intents:
+            plan = scraper.plan(intent)
+            if not plan.supported:
+                if plan.reason and plan.reason not in reasons:
+                    reasons.append(plan.reason)
+                continue
+            if plan.search_location and plan.search_location not in searches:
+                searches.append(plan.search_location)
+            if plan.note and plan.note not in notes:
+                notes.append(plan.note)
+        return searches, notes, reasons
+
+    @classmethod
+    def _plan_lines(
+        cls, portals, intents: list[LocationIntent]
+    ) -> tuple[list[str], list[str]]:
+        """Return per-portal resolution lines and pause warnings."""
+        lines: list[str] = []
+        warnings: list[str] = []
+        for slug in portals:
+            scraper = SCRAPERS.get(slug)
+            if scraper is None:
+                continue
+            searches, notes, reasons = cls._scraper_plans(scraper, intents)
+            if searches:
+                lines.append(f"• **{scraper.source}** → {' · '.join(searches)}")
+                for note in notes:
+                    lines.append(f"   ↳ {note}")
+            else:
+                lines.append(f"• **{scraper.source}** → pausado (⏸️)")
+                for reason in reasons:
+                    warnings.append(f"**{scraper.source}**: {reason}")
+        return lines, warnings
+
+    @classmethod
+    def _portal_summary(cls, portals, intents: list[LocationIntent]) -> str:
+        labels: list[str] = []
+        for slug in portals:
+            scraper = SCRAPERS.get(slug)
+            if scraper is None:
+                labels.append(slug)
+                continue
+            searches, _, _ = cls._scraper_plans(scraper, intents)
+            state = "✅" if searches else "⏸️"
+            labels.append(f"{scraper.source} {state}")
+        return ", ".join(labels) or "Ninguno"
+
+    @classmethod
+    def _pause_warnings(
+        cls, portals, intents: list[LocationIntent]
+    ) -> list[str]:
+        warnings: list[str] = []
+        for slug in portals:
+            scraper = SCRAPERS.get(slug)
+            if scraper is None:
+                continue
+            searches, _, reasons = cls._scraper_plans(scraper, intents)
+            if searches:
+                continue
+            reason = reasons[0] if reasons else "sin ubicaciones compatibles."
+            warnings.append(f"**{scraper.source}** está en pausa: {reason}")
+        return warnings
+
+    @staticmethod
+    def _portal_supported(scraper, intents: list[LocationIntent]) -> bool:
+        return any(scraper.plan(intent).supported for intent in intents)
+
+    @staticmethod
+    def _covered_countries(scraper) -> str:
+        if scraper.COVERED_COUNTRIES is None:
+            return "cualquier país"
+        names = []
+        for code in sorted(scraper.COVERED_COUNTRIES):
+            country = COUNTRIES_BY_CODE.get(code)
+            names.append(country.name_es if country else code)
+        return ", ".join(names)
+
     @app_commands.command(name="set-channel", description="Configura el canal de notificaciones.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
@@ -57,17 +178,150 @@ class AdminCog(commands.Cog):
             f"Las vacantes se enviarán en {channel.mention}.", ephemeral=True
         )
 
-    @app_commands.command(name="set-location", description="Configura país o ciudad de búsqueda.")
+    @app_commands.command(
+        name="set-location",
+        description="Configura la ubicación de búsqueda (reemplaza las anteriores).",
+    )
+    @app_commands.describe(
+        location="Ej.: Worldwide · Remoto · Santiago, Chile · Remoto, España"
+    )
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     async def set_location(self, interaction: discord.Interaction, location: str) -> None:
         try:
-            clean_location = self._clean(location, "La ubicación")
-        except ValueError as exc:
+            intent = parse_location(location)
+        except LocationError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
-        await self.database.set_location(interaction.guild_id or 0, clean_location)
-        await interaction.response.send_message(f"Ubicación configurada: **{clean_location}**.", ephemeral=True)
+        guild_id = interaction.guild_id or 0
+        await self.database.set_location(guild_id, intent.label)
+        config = await self.database.get_guild_config(guild_id)
+        intents = self._intents(config.locations)
+        lines, warnings = self._plan_lines(config.portals, intents)
+
+        parts = [f"Ubicación configurada: **{intent.label}**"]
+        if intent.inferred_country:
+            parts.append(
+                f"Interpreté **{intent.city}** como ciudad de Chile. "
+                "El formato recomendado es `ciudad, país`."
+            )
+        parts.append("\n".join(lines))
+        if warnings:
+            parts.append("\n".join(warnings))
+        if not any(
+            self._portal_supported(SCRAPERS[slug], intents)
+            for slug in config.portals
+            if slug in SCRAPERS
+        ):
+            parts.append(
+                "⚠️ Ningún portal activo cubre esta ubicación. "
+                "Activa LinkedIn o cambia la ubicación."
+            )
+        await interaction.response.send_message("\n\n".join(parts), ephemeral=True)
+
+    @app_commands.command(
+        name="add-location",
+        description="Agrega una ubicación de búsqueda (máximo 3).",
+    )
+    @app_commands.describe(
+        location="Ej.: Osorno, Chile · La Unión, Chile · Remoto, España"
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def add_location(self, interaction: discord.Interaction, location: str) -> None:
+        try:
+            intent = parse_location(location)
+        except LocationError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        guild_id = interaction.guild_id or 0
+        config = await self.database.get_guild_config(guild_id)
+        if any(
+            self._location_key(existing) == self._location_key(intent.label)
+            for existing in config.locations
+        ):
+            await interaction.response.send_message(
+                f"**{intent.label}** ya estaba configurada.", ephemeral=True
+            )
+            return
+        if len(config.locations) >= MAX_LOCATIONS:
+            await interaction.response.send_message(
+                f"Ya tienes **{MAX_LOCATIONS}** ubicaciones, el máximo permitido. "
+                "Quita una con `/remove-location` antes de agregar otra.",
+                ephemeral=True,
+            )
+            return
+        await self.database.add_location(guild_id, intent.label)
+        config = await self.database.get_guild_config(guild_id)
+        intents = self._intents(config.locations)
+        lines, warnings = self._plan_lines(config.portals, intents)
+
+        parts = [
+            f"Ubicación agregada: **{intent.label}** "
+            f"({len(config.locations)}/{MAX_LOCATIONS})."
+        ]
+        if intent.inferred_country:
+            parts.append(
+                f"Interpreté **{intent.city}** como ciudad de Chile. "
+                "El formato recomendado es `ciudad, país`."
+            )
+        parts.append("\n".join(lines))
+        if warnings:
+            parts.append("\n".join(warnings))
+        await interaction.response.send_message("\n\n".join(parts), ephemeral=True)
+
+    @app_commands.command(
+        name="remove-location",
+        description="Quita una ubicación de búsqueda configurada.",
+    )
+    @app_commands.describe(location="Ubicación que quieres quitar.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def remove_location(self, interaction: discord.Interaction, location: str) -> None:
+        guild_id = interaction.guild_id or 0
+        config = await self.database.get_guild_config(guild_id)
+        target = next(
+            (
+                value
+                for value in config.locations
+                if self._location_key(value) == self._location_key(location)
+            ),
+            None,
+        )
+        if target is None:
+            await interaction.response.send_message(
+                f"No encontré **{location}** entre tus ubicaciones.", ephemeral=True
+            )
+            return
+        was_last = len(config.locations) <= 1
+        await self.database.remove_location(guild_id, target)
+        config = await self.database.get_guild_config(guild_id)
+        intents = self._intents(config.locations)
+        lines, warnings = self._plan_lines(config.portals, intents)
+        parts = [f"Ubicación eliminada: **{target}**."]
+        if was_last:
+            parts.append(
+                "No quedan ubicaciones guardadas; se usará **Worldwide** "
+                "por defecto."
+            )
+        parts.append("\n".join(lines))
+        if warnings:
+            parts.append("\n".join(warnings))
+        await interaction.response.send_message("\n\n".join(parts), ephemeral=True)
+
+    @remove_location.autocomplete("location")
+    async def remove_location_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        if interaction.guild_id is None:
+            return []
+        locations = await self.database.get_locations(interaction.guild_id)
+        normalized_current = normalize(current)
+        return [
+            app_commands.Choice(name=value, value=value)
+            for value in locations
+            if normalized_current in normalize(value)
+        ][:25]
 
     @app_commands.command(
         name="set-max-age",
@@ -201,8 +455,11 @@ class AdminCog(commands.Cog):
             value=(
                 "1. `/set-channel` — elige dónde se publicarán las alertas. "
                 "No hay un canal predeterminado.\n"
-                "2. `/set-location` — define el país, ciudad o modalidad "
-                "`Remote` que quieres buscar. Por defecto es `Worldwide`.\n"
+                "2. `/set-location` — define la ubicación con un formato "
+                "estándar: `Worldwide`, `Remoto`, `Remoto, país`, `País` "
+                "o `Ciudad, país`. Por ejemplo `Worldwide`, `Chile`, "
+                "`Santiago, Chile` o `Remoto, España`. Por defecto se busca "
+                "en `Worldwide`. Puedes sumar hasta 3 con `/add-location`.\n"
                 "3. `/add-keyword` — agrega los cargos o tecnologías que "
                 "quieres encontrar, por ejemplo `python, backend`."
             ),
@@ -217,7 +474,9 @@ class AdminCog(commands.Cog):
                 "Por defecto acepta todos los idiomas.\n"
                 "`/add-portal` y `/remove-portal` — activa o desactiva "
                 "portales. LinkedIn está activo por defecto y puedes sumar "
-                "ChileTrabajos.\n"
+                "otros como ChileTrabajos. Cada portal tiene su propia "
+                "cobertura: si todas tus ubicaciones quedan fuera, se pausa "
+                "automáticamente.\n"
                 "`/add-blacklist-company` y `/remove-blacklist-company` — "
                 "ignora o vuelve a permitir empresas."
             ),
@@ -226,9 +485,10 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="📋 Consultar configuración",
             value=(
-                "Usa `/list-keywords`, `/list-languages` o `/list-portals` "
-                "para revisar cada sección. `/status` muestra un resumen "
-                "general y confirma si el bot está listo."
+                "Usa `/list-keywords`, `/list-languages`, "
+                "`/list-portals` o `/list-locations` para revisar cada "
+                "sección. `/status` muestra un resumen general y confirma "
+                "si el bot está listo."
             ),
             inline=False,
         )
@@ -297,14 +557,33 @@ class AdminCog(commands.Cog):
     async def add_portal(
         self, interaction: discord.Interaction, portal: app_commands.Choice[str]
     ) -> None:
-        added = await self.database.add_portal(
-            interaction.guild_id or 0, portal.value
-        )
-        if added:
-            message = f"Portal activado: **{portal.name}**."
-        else:
-            message = f"El portal **{portal.name}** ya estaba activo."
-        await interaction.response.send_message(message, ephemeral=True)
+        guild_id = interaction.guild_id or 0
+        config = await self.database.get_guild_config(guild_id)
+        if portal.value in config.portals:
+            await interaction.response.send_message(
+                f"El portal **{portal.name}** ya estaba activo.", ephemeral=True
+            )
+            return
+        scraper = SCRAPERS.get(portal.value)
+        intents = self._intents(config.locations)
+        if scraper is not None and not self._portal_supported(scraper, intents):
+            await interaction.response.send_message(
+                f"No activé **{portal.name}**: solo cubre "
+                f"{self._covered_countries(scraper)} y tus ubicaciones "
+                f"actuales son **{', '.join(config.locations) or 'ninguna'}**.\n\n"
+                "Cambia la ubicación con `/set-location` o agrega una "
+                "compatible con `/add-location`, y vuelve a intentarlo.",
+                ephemeral=True,
+            )
+            return
+        await self.database.add_portal(guild_id, portal.value)
+        lines, warnings = self._plan_lines((portal.value,), intents)
+        parts = [f"Portal activado: **{portal.name}**."]
+        if lines:
+            parts.append("\n".join(lines))
+        if warnings:
+            parts.append("\n".join(warnings))
+        await interaction.response.send_message("\n\n".join(parts), ephemeral=True)
 
     @app_commands.command(
         name="remove-portal",
@@ -365,43 +644,120 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(
         name="list-portals",
-        description="Muestra los portales disponibles y los activos en este servidor.",
+        description="Muestra los portales disponibles, su estado y cobertura.",
     )
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     async def list_portals(self, interaction: discord.Interaction) -> None:
-        config = await self.database.get_guild_config(interaction.guild_id or 0)
+        guild_id = interaction.guild_id or 0
+        config = await self.database.get_guild_config(guild_id)
+        intents = self._intents(config.locations)
         active_slugs = set(config.portals)
-        available = "\n".join(
-            f"• **{scraper.source}** (`{slug}`) — "
-            f"{'activo' if slug in active_slugs else 'no activo'}"
-            for slug, scraper in SCRAPERS.items()
-        ) or "Ninguno"
+        lines = ["**Portales disponibles**"]
+        running = 0
+        for slug, scraper in SCRAPERS.items():
+            coverage = f" · cobertura: {self._covered_countries(scraper)}"
+            if slug not in active_slugs:
+                lines.append(
+                    f"• **{scraper.source}** (`{slug}`) — no activo{coverage}"
+                )
+                continue
+            searches, notes, reasons = self._scraper_plans(scraper, intents)
+            if searches:
+                running += 1
+                lines.append(
+                    f"• **{scraper.source}** (`{slug}`) — ✅ activo{coverage}"
+                )
+                lines.append(f"   ↳ Busca: {' · '.join(searches)}")
+                for note in notes:
+                    lines.append(f"   ↳ {note}")
+            else:
+                lines.append(
+                    f"• **{scraper.source}** (`{slug}`) — pausado (⏸️) {coverage}"
+                )
+                for reason in reasons:
+                    lines.append(f"   ↳ {reason}")
+
         active = ", ".join(portal_names(config.portals)) or "Ninguno"
-        await interaction.response.send_message(
-            f"**Portales disponibles**\n{available}\n\n"
-            f"**Activos en este servidor:** {active}\n\n"
-            "Usa `/add-portal` y `/remove-portal` para cambiarlos.",
-            ephemeral=True,
+        parts = [
+            "\n".join(lines),
+            f"**Activos en este servidor:** {active}\n"
+            f"**Ejecutándose ahora:** {running} de {len(config.portals)}",
+        ]
+        if running == 0:
+            parts.append(
+                "⚠️ Ningún portal se está ejecutando con las ubicaciones "
+                "actuales. Revisa `/list-locations`."
+            )
+        parts.append(PAUSE_HELP)
+        parts.append("Usa `/add-portal` y `/remove-portal` para cambiarlos.")
+        await interaction.response.send_message("\n\n".join(parts), ephemeral=True)
+
+    @app_commands.command(
+        name="list-locations",
+        description="Muestra tus ubicaciones y cómo se traducen en cada portal.",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def list_locations(self, interaction: discord.Interaction) -> None:
+        guild_id = interaction.guild_id or 0
+        config = await self.database.get_guild_config(guild_id)
+        intents = self._intents(config.locations)
+        current = (
+            "\n".join(f"• **{intent.label}**" for intent in intents)
+            if config.locations
+            else f"• Sin ubicaciones guardadas · se usa **{DEFAULT_LOCATION}**"
         )
+        lines, warnings = self._plan_lines(config.portals, intents)
+        parts = [
+            f"**Tus ubicaciones ({len(config.locations)}/{MAX_LOCATIONS})**\n"
+            f"{current}",
+            "**Traducción por portal**\n" + "\n".join(lines),
+        ]
+        if warnings:
+            parts.append("\n".join(warnings))
+        parts.append(LOCATION_FORMAT_HELP)
+        parts.append(PAUSE_HELP)
+
+        embed = discord.Embed(
+            title="Ubicaciones de búsqueda",
+            description="\n\n".join(parts),
+            colour=0x0A66C2,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="list-keywords", description="Muestra la configuración del servidor.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     async def list_keywords(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
+        intents = self._intents(config.locations)
         channel = f"<#{config.channel_id}>" if config.channel_id else "No configurado"
+        locations = (
+            " · ".join(f"**{intent.label}**" for intent in intents)
+            if config.locations
+            else f"**{DEFAULT_LOCATION}** (por defecto)"
+        )
         keywords = ", ".join(config.keywords) if config.keywords else "Ninguna"
         blacklist = ", ".join(config.blacklisted_companies) if config.blacklisted_companies else "Ninguna"
         languages = ", ".join(config.languages) if config.languages else "Todos"
-        portals = ", ".join(portal_names(config.portals)) or "Ninguno"
-        await interaction.response.send_message(
-            f"**Canal:** {channel}\n**Ubicación:** {config.location}\n"
-            f"**Portales:** {portals}\n"
-            f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}\n"
-            f"**Palabras clave:** {keywords}\n**Empresas ignoradas:** {blacklist}\n"
+        portals = self._portal_summary(config.portals, intents)
+        parts = [
+            f"**Canal:** {channel}",
+            f"**Ubicaciones ({len(config.locations)}/{MAX_LOCATIONS}):** "
+            f"{locations}",
+            f"**Portales:** {portals}",
+            f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}",
+            f"**Palabras clave:** {keywords}",
+            f"**Empresas ignoradas:** {blacklist}",
             f"**Idiomas:** {languages}",
-            ephemeral=True,
+        ]
+        warnings = self._pause_warnings(config.portals, intents)
+        if warnings:
+            parts.append("\n".join(warnings))
+            parts.append(PAUSE_HELP)
+        await interaction.response.send_message(
+            "\n".join(parts), ephemeral=True
         )
 
     @app_commands.command(name="status", description="Muestra el estado del bot en este servidor.")
@@ -409,16 +765,32 @@ class AdminCog(commands.Cog):
     @app_commands.default_permissions(manage_guild=True)
     async def status(self, interaction: discord.Interaction) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
+        intents = self._intents(config.locations)
         total = await self.database.count_notified(interaction.guild_id or 0)
         interval = self.bot.settings.check_interval_minutes
-        portals = ", ".join(portal_names(config.portals)) or "Ninguno"
-        await interaction.response.send_message(
-            f"**Estado:** online\n**Portales activos:** {portals}\n"
-            f"**Latencia:** {self.bot.latency * 1000:.0f} ms\n"
-            f"**Ofertas enviadas:** {total}\n**Intervalo:** {interval:g} min\n"
+        portals = self._portal_summary(config.portals, intents)
+        parts = [
+            "**Estado:** online",
+            f"**Portales activos:** {portals}",
+            f"**Latencia:** {self.bot.latency * 1000:.0f} ms",
+            f"**Ofertas enviadas:** {total}",
+            f"**Intervalo:** {interval:g} min",
             f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}",
-            ephemeral=True,
+        ]
+        warnings = self._pause_warnings(config.portals, intents)
+        if warnings:
+            parts.append("\n".join(warnings))
+        running = any(
+            self._portal_supported(SCRAPERS[slug], intents)
+            for slug in config.portals
+            if slug in SCRAPERS
         )
+        if not running:
+            parts.append(
+                "⚠️ Ningún portal se está ejecutando con las ubicaciones "
+                "actuales. Revisa `/list-locations`."
+            )
+        await interaction.response.send_message("\n".join(parts), ephemeral=True)
 
     async def cog_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
