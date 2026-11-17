@@ -1,0 +1,1585 @@
+{
+  "schema_version": 1,
+  "default_country": "CL",
+  "note": "Slugs extraidos de los filtros reales de computrabajo.com. El slug se usa textualmente en /trabajo-de-<keyword>-en-<slug>. Agrega equivalencias en aliases sin tocar Python.",
+  "countries": {
+    "ar": {
+      "label": "Argentina",
+      "subdomain": "ar",
+      "aliases": [
+        "argentina",
+        "Argentina"
+      ],
+      "locations": [
+        {
+          "slug": "buenos-aires",
+          "label": "Buenos Aires",
+          "region": "Buenos Aires",
+          "aliases": [
+            "provincia de buenos aires",
+            "Buenos Aires"
+          ]
+        },
+        {
+          "slug": "buenos-aires-gba-en-san-martin",
+          "label": "San Martín, Gran Buenos Aires",
+          "region": "Gran Buenos Aires",
+          "city": "San Martín",
+          "aliases": [
+            "san martin",
+            "San Martín"
+          ]
+        },
+        {
+          "slug": "buenos-aires-gba",
+          "label": "Gran Buenos Aires",
+          "region": "Gran Buenos Aires",
+          "aliases": [
+            "gba",
+            "Gran Buenos Aires"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-belgrano",
+          "label": "Belgrano, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Belgrano",
+          "aliases": [
+            "Belgrano"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-monserrat",
+          "label": "Monserrat, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Monserrat",
+          "aliases": [
+            "Monserrat"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-palermo",
+          "label": "Palermo, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Palermo",
+          "aliases": [
+            "Palermo"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-parque-patricios",
+          "label": "Parque Patricios, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Parque Patricios",
+          "aliases": [
+            "Parque Patricios"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-recoleta",
+          "label": "Recoleta, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Recoleta",
+          "aliases": [
+            "Recoleta"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-retiro",
+          "label": "Retiro, Capital Federal",
+          "region": "Capital Federal",
+          "city": "Retiro",
+          "aliases": [
+            "Retiro"
+          ]
+        },
+        {
+          "slug": "capital-federal-en-san-nicolas",
+          "label": "San Nicolás, Capital Federal",
+          "region": "Capital Federal",
+          "city": "San Nicolás",
+          "aliases": [
+            "san nicolas",
+            "San Nicolás"
+          ]
+        },
+        {
+          "slug": "capital-federal",
+          "label": "Capital Federal",
+          "region": "Capital Federal",
+          "aliases": [
+            "buenos aires",
+            "caba",
+            "ciudad de buenos aires",
+            "Capital Federal"
+          ]
+        },
+        {
+          "slug": "cordoba-en-capital",
+          "label": "Córdoba Capital, Córdoba",
+          "region": "Córdoba",
+          "city": "Córdoba Capital",
+          "aliases": [
+            "capital",
+            "Córdoba Capital"
+          ]
+        },
+        {
+          "slug": "cordoba",
+          "label": "Córdoba",
+          "region": "Córdoba",
+          "aliases": [
+            "cordoba",
+            "Córdoba"
+          ]
+        },
+        {
+          "slug": "santa-fe-en-rosario",
+          "label": "Rosario, Santa Fe",
+          "region": "Santa Fe",
+          "city": "Rosario",
+          "aliases": [
+            "Rosario"
+          ]
+        },
+        {
+          "slug": "santa-fe",
+          "label": "Santa Fe",
+          "region": "Santa Fe",
+          "aliases": [
+            "Santa Fe"
+          ]
+        }
+      ]
+    },
+    "bo": {
+      "label": "Bolivia",
+      "subdomain": "bo",
+      "aliases": [
+        "bolivia",
+        "Bolivia"
+      ],
+      "locations": []
+    },
+    "cl": {
+      "label": "Chile",
+      "subdomain": "cl",
+      "aliases": [
+        "chile",
+        "Chile"
+      ],
+      "locations": [
+        {
+          "slug": "antofagasta-en-antofagasta",
+          "label": "Antofagasta, Antofagasta",
+          "region": "Antofagasta",
+          "city": "Antofagasta",
+          "aliases": [
+            "Antofagasta"
+          ]
+        },
+        {
+          "slug": "antofagasta-en-calama",
+          "label": "Calama, Antofagasta",
+          "region": "Antofagasta",
+          "city": "Calama",
+          "aliases": [
+            "Calama"
+          ]
+        },
+        {
+          "slug": "antofagasta",
+          "label": "Antofagasta",
+          "region": "Antofagasta",
+          "aliases": [
+            "Antofagasta"
+          ]
+        },
+        {
+          "slug": "araucania",
+          "label": "Araucanía",
+          "region": "Araucanía",
+          "aliases": [
+            "araucania",
+            "Araucanía"
+          ]
+        },
+        {
+          "slug": "biobio-en-concepcion",
+          "label": "Concepción, Biobío",
+          "region": "Biobío",
+          "city": "Concepción",
+          "aliases": [
+            "concepcion",
+            "Concepción"
+          ]
+        },
+        {
+          "slug": "biobio",
+          "label": "Biobío",
+          "region": "Biobío",
+          "aliases": [
+            "bio bio",
+            "biobio",
+            "Biobío"
+          ]
+        },
+        {
+          "slug": "coquimbo-en-la-serena",
+          "label": "La Serena, Coquimbo",
+          "region": "Coquimbo",
+          "city": "La Serena",
+          "aliases": [
+            "La Serena"
+          ]
+        },
+        {
+          "slug": "coquimbo",
+          "label": "Coquimbo",
+          "region": "Coquimbo",
+          "aliases": [
+            "Coquimbo"
+          ]
+        },
+        {
+          "slug": "libertador-b-o-higgins",
+          "label": "Libertador B. O'Higgins",
+          "region": "Libertador B. O'Higgins",
+          "aliases": [
+            "ohiggins",
+            "o'higgins",
+            "libertador general bernardo o'higgins",
+            "Libertador B. O'Higgins"
+          ]
+        },
+        {
+          "slug": "los-lagos-en-puerto-montt",
+          "label": "Puerto Montt, Los Lagos",
+          "region": "Los Lagos",
+          "city": "Puerto Montt",
+          "aliases": [
+            "Puerto Montt"
+          ]
+        },
+        {
+          "slug": "los-lagos",
+          "label": "Los Lagos",
+          "region": "Los Lagos",
+          "aliases": [
+            "Los Lagos"
+          ]
+        },
+        {
+          "slug": "maule-en-talca",
+          "label": "Talca, Maule",
+          "region": "Maule",
+          "city": "Talca",
+          "aliases": [
+            "Talca"
+          ]
+        },
+        {
+          "slug": "maule",
+          "label": "Maule",
+          "region": "Maule",
+          "aliases": [
+            "Maule"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-lampa",
+          "label": "Lampa, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Lampa",
+          "aliases": [
+            "Lampa"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-padre-hurtado",
+          "label": "Padre Hurtado, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Padre Hurtado",
+          "aliases": [
+            "Padre Hurtado"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-puente-alto",
+          "label": "Puente Alto, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Puente Alto",
+          "aliases": [
+            "Puente Alto"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-san-bernardo",
+          "label": "San Bernardo, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "San Bernardo",
+          "aliases": [
+            "San Bernardo"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---cerrillos",
+          "label": "Santiago Cerrillos, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Cerrillos",
+          "aliases": [
+            "cerrillos",
+            "Santiago Cerrillos"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---huechuraba",
+          "label": "Santiago Huechuraba, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Huechuraba",
+          "aliases": [
+            "huechuraba",
+            "Santiago Huechuraba"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---la-florida",
+          "label": "Santiago La Florida, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago La Florida",
+          "aliases": [
+            "la florida",
+            "Santiago La Florida"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---las-condes",
+          "label": "Santiago Las Condes, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Las Condes",
+          "aliases": [
+            "las condes",
+            "Santiago Las Condes"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---maipu",
+          "label": "Santiago Maipú, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Maipú",
+          "aliases": [
+            "maipu",
+            "maipú",
+            "Santiago Maipú"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---nunoa",
+          "label": "Santiago Ñuñoa, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Ñuñoa",
+          "aliases": [
+            "nunoa",
+            "ñuñoa",
+            "Santiago Ñuñoa"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---providencia",
+          "label": "Santiago Providencia, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Providencia",
+          "aliases": [
+            "providencia",
+            "Santiago Providencia"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---pudahuel",
+          "label": "Santiago Pudahuel, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Pudahuel",
+          "aliases": [
+            "pudahuel",
+            "Santiago Pudahuel"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago---quilicura",
+          "label": "Santiago Quilicura, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Quilicura",
+          "aliases": [
+            "quilicura",
+            "Santiago Quilicura"
+          ]
+        },
+        {
+          "slug": "rmetropolitana-en-santiago-centro",
+          "label": "Santiago Centro, R. Metropolitana",
+          "region": "R. Metropolitana",
+          "city": "Santiago Centro",
+          "aliases": [
+            "santiago",
+            "centro",
+            "santiago centro",
+            "Santiago Centro"
+          ]
+        },
+        {
+          "slug": "rmetropolitana",
+          "label": "R. Metropolitana",
+          "region": "R. Metropolitana",
+          "aliases": [
+            "region metropolitana",
+            "rm",
+            "R. Metropolitana"
+          ]
+        },
+        {
+          "slug": "tarapaca-en-iquique",
+          "label": "Iquique, Tarapacá",
+          "region": "Tarapacá",
+          "city": "Iquique",
+          "aliases": [
+            "Iquique"
+          ]
+        },
+        {
+          "slug": "tarapaca",
+          "label": "Tarapacá",
+          "region": "Tarapacá",
+          "aliases": [
+            "tarapaca",
+            "Tarapacá"
+          ]
+        },
+        {
+          "slug": "valparaiso-en-vina-del-mar",
+          "label": "Viña del Mar, Valparaíso",
+          "region": "Valparaíso",
+          "city": "Viña del Mar",
+          "aliases": [
+            "vina del mar",
+            "viña del mar",
+            "Viña del Mar"
+          ]
+        },
+        {
+          "slug": "valparaiso",
+          "label": "Valparaíso",
+          "region": "Valparaíso",
+          "aliases": [
+            "valparaiso",
+            "Valparaíso"
+          ]
+        }
+      ]
+    },
+    "co": {
+      "label": "Colombia",
+      "subdomain": "co",
+      "aliases": [
+        "colombia",
+        "Colombia"
+      ],
+      "locations": [
+        {
+          "slug": "antioquia",
+          "label": "Antioquia",
+          "region": "Antioquia",
+          "aliases": [
+            "Antioquia"
+          ]
+        },
+        {
+          "slug": "atlantico",
+          "label": "Atlántico",
+          "region": "Atlántico",
+          "aliases": [
+            "atlantico",
+            "Atlántico"
+          ]
+        },
+        {
+          "slug": "bogota-dc",
+          "label": "Bogotá D.C.",
+          "region": "Bogotá D.C.",
+          "aliases": [
+            "bogota",
+            "bogota dc",
+            "bogota d.c.",
+            "Bogotá D.C."
+          ]
+        },
+        {
+          "slug": "bolivar",
+          "label": "Bolívar",
+          "region": "Bolívar",
+          "aliases": [
+            "bolivar",
+            "Bolívar"
+          ]
+        },
+        {
+          "slug": "cundinamarca-en-mosquera",
+          "label": "Mosquera, Cundinamarca",
+          "region": "Cundinamarca",
+          "city": "Mosquera",
+          "aliases": [
+            "Mosquera"
+          ]
+        },
+        {
+          "slug": "cundinamarca",
+          "label": "Cundinamarca",
+          "region": "Cundinamarca",
+          "aliases": [
+            "Cundinamarca"
+          ]
+        },
+        {
+          "slug": "huila",
+          "label": "Huila",
+          "region": "Huila",
+          "aliases": [
+            "Huila"
+          ]
+        },
+        {
+          "slug": "norte-de-santander",
+          "label": "Norte de Santander",
+          "region": "Norte de Santander",
+          "aliases": [
+            "Norte de Santander"
+          ]
+        },
+        {
+          "slug": "risaralda",
+          "label": "Risaralda",
+          "region": "Risaralda",
+          "aliases": [
+            "Risaralda"
+          ]
+        },
+        {
+          "slug": "santander",
+          "label": "Santander",
+          "region": "Santander",
+          "aliases": [
+            "Santander"
+          ]
+        },
+        {
+          "slug": "valle-del-cauca",
+          "label": "Valle del Cauca",
+          "region": "Valle del Cauca",
+          "aliases": [
+            "Valle del Cauca"
+          ]
+        }
+      ]
+    },
+    "cr": {
+      "label": "Costa Rica",
+      "subdomain": "cr",
+      "aliases": [
+        "costa rica",
+        "Costa Rica"
+      ],
+      "locations": [
+        {
+          "slug": "san-jose",
+          "label": "San José",
+          "region": "San José",
+          "aliases": [
+            "san jose",
+            "San José"
+          ]
+        }
+      ]
+    },
+    "do": {
+      "label": "República Dominicana",
+      "subdomain": "do",
+      "aliases": [
+        "republica dominicana",
+        "republica dominica",
+        "dominicana",
+        "República Dominicana"
+      ],
+      "locations": [
+        {
+          "slug": "distrito-nacional-en-santo-domingo-de-guzman",
+          "label": "Santo Domingo de Guzmán, Distrito Nacional",
+          "region": "Distrito Nacional",
+          "city": "Santo Domingo de Guzmán",
+          "aliases": [
+            "santo domingo",
+            "Santo Domingo de Guzmán"
+          ]
+        },
+        {
+          "slug": "distrito-nacional",
+          "label": "Distrito Nacional",
+          "region": "Distrito Nacional",
+          "aliases": [
+            "santo domingo",
+            "Distrito Nacional"
+          ]
+        }
+      ]
+    },
+    "ec": {
+      "label": "Ecuador",
+      "subdomain": "ec",
+      "aliases": [
+        "ecuador",
+        "Ecuador"
+      ],
+      "locations": [
+        {
+          "slug": "guayas-en-guayaquil",
+          "label": "Guayaquil, Guayas",
+          "region": "Guayas",
+          "city": "Guayaquil",
+          "aliases": [
+            "Guayaquil"
+          ]
+        },
+        {
+          "slug": "guayas",
+          "label": "Guayas",
+          "region": "Guayas",
+          "aliases": [
+            "Guayas"
+          ]
+        },
+        {
+          "slug": "pichincha-en-quito",
+          "label": "Quito, Pichincha",
+          "region": "Pichincha",
+          "city": "Quito",
+          "aliases": [
+            "Quito"
+          ]
+        },
+        {
+          "slug": "pichincha",
+          "label": "Pichincha",
+          "region": "Pichincha",
+          "aliases": [
+            "Pichincha"
+          ]
+        }
+      ]
+    },
+    "gt": {
+      "label": "Guatemala",
+      "subdomain": "gt",
+      "aliases": [
+        "guatemala",
+        "Guatemala"
+      ],
+      "locations": [
+        {
+          "slug": "escuintla-en-escuintla",
+          "label": "Escuintla, Escuintla",
+          "region": "Escuintla",
+          "city": "Escuintla",
+          "aliases": [
+            "Escuintla"
+          ]
+        },
+        {
+          "slug": "escuintla",
+          "label": "Escuintla",
+          "region": "Escuintla",
+          "aliases": [
+            "Escuintla"
+          ]
+        },
+        {
+          "slug": "guatemala-en-guatemala-ciudad",
+          "label": "Guatemala Ciudad, Guatemala",
+          "region": "Guatemala",
+          "city": "Guatemala Ciudad",
+          "aliases": [
+            "ciudad de guatemala",
+            "guatemala ciudad",
+            "Guatemala Ciudad"
+          ]
+        },
+        {
+          "slug": "guatemala-en-mixco",
+          "label": "Mixco, Guatemala",
+          "region": "Guatemala",
+          "city": "Mixco",
+          "aliases": [
+            "Mixco"
+          ]
+        },
+        {
+          "slug": "guatemala-en-villa-nueva",
+          "label": "Villa Nueva, Guatemala",
+          "region": "Guatemala",
+          "city": "Villa Nueva",
+          "aliases": [
+            "Villa Nueva"
+          ]
+        },
+        {
+          "slug": "guatemala",
+          "label": "Guatemala",
+          "region": "Guatemala",
+          "aliases": [
+            "Guatemala"
+          ]
+        }
+      ]
+    },
+    "hn": {
+      "label": "Honduras",
+      "subdomain": "hn",
+      "aliases": [
+        "honduras",
+        "Honduras"
+      ],
+      "locations": [
+        {
+          "slug": "cortes-en-san-pedro-sula",
+          "label": "San Pedro Sula, Cortés",
+          "region": "Cortés",
+          "city": "San Pedro Sula",
+          "aliases": [
+            "San Pedro Sula"
+          ]
+        },
+        {
+          "slug": "cortes",
+          "label": "Cortés",
+          "region": "Cortés",
+          "aliases": [
+            "cortes",
+            "Cortés"
+          ]
+        },
+        {
+          "slug": "francisco-morazan-en-distrito-central",
+          "label": "Distrito Central, Francisco Morazán",
+          "region": "Francisco Morazán",
+          "city": "Distrito Central",
+          "aliases": [
+            "tegucigalpa",
+            "Distrito Central"
+          ]
+        },
+        {
+          "slug": "francisco-morazan",
+          "label": "Francisco Morazán",
+          "region": "Francisco Morazán",
+          "aliases": [
+            "francisco morazan",
+            "Francisco Morazán"
+          ]
+        }
+      ]
+    },
+    "mx": {
+      "label": "México",
+      "subdomain": "mx",
+      "aliases": [
+        "mexico",
+        "méxico",
+        "México"
+      ],
+      "locations": [
+        {
+          "slug": "guadalajara",
+          "label": "Guadalajara, Jalisco",
+          "region": "Jalisco",
+          "city": "Guadalajara",
+          "aliases": [
+            "guadalajara",
+            "Guadalajara"
+          ]
+        },
+        {
+          "slug": "monterrey",
+          "label": "Monterrey, Nuevo León",
+          "region": "Nuevo León",
+          "city": "Monterrey",
+          "aliases": [
+            "monterrey",
+            "Monterrey"
+          ]
+        },
+        {
+          "slug": "merida",
+          "label": "Mérida, Yucatán",
+          "region": "Yucatán",
+          "city": "Mérida",
+          "aliases": [
+            "merida",
+            "mérida",
+            "Mérida"
+          ]
+        },
+        {
+          "slug": "toluca",
+          "label": "Toluca, Estado de México",
+          "region": "Estado de México",
+          "city": "Toluca",
+          "aliases": [
+            "toluca",
+            "Toluca"
+          ]
+        },
+        {
+          "slug": "queretaro",
+          "label": "Querétaro, Querétaro",
+          "region": "Querétaro",
+          "city": "Querétaro",
+          "aliases": [
+            "queretaro",
+            "Querétaro"
+          ]
+        },
+        {
+          "slug": "chihuahua",
+          "label": "Chihuahua, Chihuahua",
+          "region": "Chihuahua",
+          "city": "Chihuahua",
+          "aliases": [
+            "chihuahua",
+            "Chihuahua"
+          ]
+        },
+        {
+          "slug": "puebla-ciudad",
+          "label": "Puebla, Puebla",
+          "region": "Puebla",
+          "city": "Puebla",
+          "aliases": [
+            "puebla",
+            "puebla ciudad",
+            "Puebla"
+          ]
+        },
+        {
+          "slug": "miguel-hidalgo",
+          "label": "Miguel Hidalgo, Ciudad de México",
+          "region": "Ciudad de México",
+          "city": "Miguel Hidalgo",
+          "aliases": [
+            "miguel hidalgo",
+            "Miguel Hidalgo"
+          ]
+        },
+        {
+          "slug": "aguascalientes",
+          "label": "Aguascalientes",
+          "region": "Aguascalientes",
+          "aliases": [
+            "Aguascalientes"
+          ]
+        },
+        {
+          "slug": "baja-california",
+          "label": "Baja California",
+          "region": "Baja California",
+          "aliases": [
+            "Baja California"
+          ]
+        },
+        {
+          "slug": "chiapas",
+          "label": "Chiapas",
+          "region": "Chiapas",
+          "aliases": [
+            "Chiapas"
+          ]
+        },
+        {
+          "slug": "ciudad-de-mexico",
+          "label": "Ciudad de México",
+          "region": "Ciudad de México",
+          "aliases": [
+            "cdmx",
+            "df",
+            "distrito federal",
+            "mexico df",
+            "Ciudad de México"
+          ]
+        },
+        {
+          "slug": "coahuila-de-zaragoza",
+          "label": "Coahuila de Zaragoza",
+          "region": "Coahuila de Zaragoza",
+          "aliases": [
+            "coahuila",
+            "Coahuila de Zaragoza"
+          ]
+        },
+        {
+          "slug": "colima",
+          "label": "Colima",
+          "region": "Colima",
+          "aliases": [
+            "Colima"
+          ]
+        },
+        {
+          "slug": "estado-de-mexico",
+          "label": "Estado de México",
+          "region": "Estado de México",
+          "aliases": [
+            "edomex",
+            "mexico estado",
+            "Estado de México"
+          ]
+        },
+        {
+          "slug": "guanajuato",
+          "label": "Guanajuato",
+          "region": "Guanajuato",
+          "aliases": [
+            "Guanajuato"
+          ]
+        },
+        {
+          "slug": "hidalgo",
+          "label": "Hidalgo",
+          "region": "Hidalgo",
+          "aliases": [
+            "Hidalgo"
+          ]
+        },
+        {
+          "slug": "jalisco",
+          "label": "Jalisco",
+          "region": "Jalisco",
+          "aliases": [
+            "Jalisco"
+          ]
+        },
+        {
+          "slug": "michoacan-de-ocampo",
+          "label": "Michoacán de Ocampo",
+          "region": "Michoacán de Ocampo",
+          "aliases": [
+            "michoacan",
+            "Michoacán de Ocampo"
+          ]
+        },
+        {
+          "slug": "nuevo-leon",
+          "label": "Nuevo León",
+          "region": "Nuevo León",
+          "aliases": [
+            "nuevo leon",
+            "Nuevo León"
+          ]
+        },
+        {
+          "slug": "oaxaca",
+          "label": "Oaxaca",
+          "region": "Oaxaca",
+          "aliases": [
+            "Oaxaca"
+          ]
+        },
+        {
+          "slug": "puebla",
+          "label": "Puebla",
+          "region": "Puebla",
+          "aliases": [
+            "Puebla"
+          ]
+        },
+        {
+          "slug": "quintana-roo",
+          "label": "Quintana Roo",
+          "region": "Quintana Roo",
+          "aliases": [
+            "Quintana Roo"
+          ]
+        },
+        {
+          "slug": "san-luis-potosi",
+          "label": "San Luis Potosí",
+          "region": "San Luis Potosí",
+          "aliases": [
+            "san luis potosi",
+            "San Luis Potosí"
+          ]
+        },
+        {
+          "slug": "sinaloa",
+          "label": "Sinaloa",
+          "region": "Sinaloa",
+          "aliases": [
+            "Sinaloa"
+          ]
+        },
+        {
+          "slug": "sonora",
+          "label": "Sonora",
+          "region": "Sonora",
+          "aliases": [
+            "Sonora"
+          ]
+        },
+        {
+          "slug": "tamaulipas",
+          "label": "Tamaulipas",
+          "region": "Tamaulipas",
+          "aliases": [
+            "Tamaulipas"
+          ]
+        },
+        {
+          "slug": "veracruz-de-ignacio-de-la-llave",
+          "label": "Veracruz de Ignacio de la Llave",
+          "region": "Veracruz de Ignacio de la Llave",
+          "aliases": [
+            "veracruz",
+            "Veracruz de Ignacio de la Llave"
+          ]
+        },
+        {
+          "slug": "yucatan",
+          "label": "Yucatán",
+          "region": "Yucatán",
+          "aliases": [
+            "yucatan",
+            "Yucatán"
+          ]
+        }
+      ]
+    },
+    "ni": {
+      "label": "Nicaragua",
+      "subdomain": "ni",
+      "aliases": [
+        "nicaragua",
+        "Nicaragua"
+      ],
+      "locations": [
+        {
+          "slug": "managua-en-managua",
+          "label": "Managua, Managua",
+          "region": "Managua",
+          "city": "Managua",
+          "aliases": [
+            "Managua"
+          ]
+        },
+        {
+          "slug": "managua",
+          "label": "Managua",
+          "region": "Managua",
+          "aliases": [
+            "Managua"
+          ]
+        }
+      ]
+    },
+    "pa": {
+      "label": "Panamá",
+      "subdomain": "pa",
+      "aliases": [
+        "panama",
+        "panamá",
+        "Panamá"
+      ],
+      "locations": [
+        {
+          "slug": "panama-en-panama",
+          "label": "Panamá, Panamá",
+          "region": "Panamá",
+          "city": "Panamá",
+          "aliases": [
+            "panama",
+            "panama city",
+            "Panamá"
+          ]
+        },
+        {
+          "slug": "panama",
+          "label": "Panamá",
+          "region": "Panamá",
+          "aliases": [
+            "panama",
+            "Panamá"
+          ]
+        }
+      ]
+    },
+    "pe": {
+      "label": "Perú",
+      "subdomain": "pe",
+      "aliases": [
+        "peru",
+        "perú",
+        "Perú"
+      ],
+      "locations": [
+        {
+          "slug": "arequipa-en-arequipa",
+          "label": "Arequipa, Arequipa",
+          "region": "Arequipa",
+          "city": "Arequipa",
+          "aliases": [
+            "Arequipa"
+          ]
+        },
+        {
+          "slug": "arequipa",
+          "label": "Arequipa",
+          "region": "Arequipa",
+          "aliases": [
+            "Arequipa"
+          ]
+        },
+        {
+          "slug": "callao-en-callao",
+          "label": "Callao, Callao",
+          "region": "Callao",
+          "city": "Callao",
+          "aliases": [
+            "Callao"
+          ]
+        },
+        {
+          "slug": "callao",
+          "label": "Callao",
+          "region": "Callao",
+          "aliases": [
+            "Callao"
+          ]
+        },
+        {
+          "slug": "cusco-en-cusco",
+          "label": "Cusco, Cusco",
+          "region": "Cusco",
+          "city": "Cusco",
+          "aliases": [
+            "cuzco",
+            "Cusco"
+          ]
+        },
+        {
+          "slug": "cusco",
+          "label": "Cusco",
+          "region": "Cusco",
+          "aliases": [
+            "cuzco",
+            "Cusco"
+          ]
+        },
+        {
+          "slug": "ica-en-ica",
+          "label": "Ica, Ica",
+          "region": "Ica",
+          "city": "Ica",
+          "aliases": [
+            "Ica"
+          ]
+        },
+        {
+          "slug": "ica",
+          "label": "Ica",
+          "region": "Ica",
+          "aliases": [
+            "Ica"
+          ]
+        },
+        {
+          "slug": "junin-en-huancayo",
+          "label": "Huancayo, Junín",
+          "region": "Junín",
+          "city": "Huancayo",
+          "aliases": [
+            "Huancayo"
+          ]
+        },
+        {
+          "slug": "junin",
+          "label": "Junín",
+          "region": "Junín",
+          "aliases": [
+            "junin",
+            "Junín"
+          ]
+        },
+        {
+          "slug": "la-libertad-en-trujillo",
+          "label": "Trujillo, La Libertad",
+          "region": "La Libertad",
+          "city": "Trujillo",
+          "aliases": [
+            "Trujillo"
+          ]
+        },
+        {
+          "slug": "la-libertad",
+          "label": "La Libertad",
+          "region": "La Libertad",
+          "aliases": [
+            "La Libertad"
+          ]
+        },
+        {
+          "slug": "lambayeque-en-chiclayo",
+          "label": "Chiclayo, Lambayeque",
+          "region": "Lambayeque",
+          "city": "Chiclayo",
+          "aliases": [
+            "Chiclayo"
+          ]
+        },
+        {
+          "slug": "lambayeque",
+          "label": "Lambayeque",
+          "region": "Lambayeque",
+          "aliases": [
+            "Lambayeque"
+          ]
+        },
+        {
+          "slug": "lima-en-ate",
+          "label": "Ate, Lima",
+          "region": "Lima",
+          "city": "Ate",
+          "aliases": [
+            "Ate"
+          ]
+        },
+        {
+          "slug": "lima-en-chorrillos",
+          "label": "Chorrillos, Lima",
+          "region": "Lima",
+          "city": "Chorrillos",
+          "aliases": [
+            "Chorrillos"
+          ]
+        },
+        {
+          "slug": "lima-en-comas",
+          "label": "Comas, Lima",
+          "region": "Lima",
+          "city": "Comas",
+          "aliases": [
+            "Comas"
+          ]
+        },
+        {
+          "slug": "lima-en-independencia",
+          "label": "Independencia, Lima",
+          "region": "Lima",
+          "city": "Independencia",
+          "aliases": [
+            "Independencia"
+          ]
+        },
+        {
+          "slug": "lima-en-jesus-maria",
+          "label": "Jesús María, Lima",
+          "region": "Lima",
+          "city": "Jesús María",
+          "aliases": [
+            "jesus maria",
+            "Jesús María"
+          ]
+        },
+        {
+          "slug": "lima-en-la-molina",
+          "label": "La Molina, Lima",
+          "region": "Lima",
+          "city": "La Molina",
+          "aliases": [
+            "La Molina"
+          ]
+        },
+        {
+          "slug": "lima-en-la-victoria",
+          "label": "La Victoria, Lima",
+          "region": "Lima",
+          "city": "La Victoria",
+          "aliases": [
+            "La Victoria"
+          ]
+        },
+        {
+          "slug": "lima-en-lima",
+          "label": "Lima, Lima",
+          "region": "Lima",
+          "city": "Lima",
+          "aliases": [
+            "Lima"
+          ]
+        },
+        {
+          "slug": "lima-en-lince",
+          "label": "Lince, Lima",
+          "region": "Lima",
+          "city": "Lince",
+          "aliases": [
+            "Lince"
+          ]
+        },
+        {
+          "slug": "lima-en-los-olivos",
+          "label": "Los Olivos, Lima",
+          "region": "Lima",
+          "city": "Los Olivos",
+          "aliases": [
+            "Los Olivos"
+          ]
+        },
+        {
+          "slug": "lima-en-lurin",
+          "label": "Lurín, Lima",
+          "region": "Lima",
+          "city": "Lurín",
+          "aliases": [
+            "lurin",
+            "Lurín"
+          ]
+        },
+        {
+          "slug": "lima-en-magdalena-del-mar",
+          "label": "Magdalena del Mar, Lima",
+          "region": "Lima",
+          "city": "Magdalena del Mar",
+          "aliases": [
+            "Magdalena del Mar"
+          ]
+        },
+        {
+          "slug": "lima-en-miraflores",
+          "label": "Miraflores, Lima",
+          "region": "Lima",
+          "city": "Miraflores",
+          "aliases": [
+            "Miraflores"
+          ]
+        },
+        {
+          "slug": "lima-en-puente-piedra",
+          "label": "Puente Piedra, Lima",
+          "region": "Lima",
+          "city": "Puente Piedra",
+          "aliases": [
+            "Puente Piedra"
+          ]
+        },
+        {
+          "slug": "lima-en-san-borja",
+          "label": "San Borja, Lima",
+          "region": "Lima",
+          "city": "San Borja",
+          "aliases": [
+            "San Borja"
+          ]
+        },
+        {
+          "slug": "lima-en-san-isidro",
+          "label": "San Isidro, Lima",
+          "region": "Lima",
+          "city": "San Isidro",
+          "aliases": [
+            "San Isidro"
+          ]
+        },
+        {
+          "slug": "lima-en-san-juan-de-lurigancho",
+          "label": "San Juan de Lurigancho, Lima",
+          "region": "Lima",
+          "city": "San Juan de Lurigancho",
+          "aliases": [
+            "San Juan de Lurigancho"
+          ]
+        },
+        {
+          "slug": "lima-en-san-juan-de-miraflores",
+          "label": "San Juan de Miraflores, Lima",
+          "region": "Lima",
+          "city": "San Juan de Miraflores",
+          "aliases": [
+            "San Juan de Miraflores"
+          ]
+        },
+        {
+          "slug": "lima-en-santa-anita",
+          "label": "Santa Anita, Lima",
+          "region": "Lima",
+          "city": "Santa Anita",
+          "aliases": [
+            "Santa Anita"
+          ]
+        },
+        {
+          "slug": "lima-en-santiago-de-surco",
+          "label": "Santiago de Surco, Lima",
+          "region": "Lima",
+          "city": "Santiago de Surco",
+          "aliases": [
+            "surco",
+            "Santiago de Surco"
+          ]
+        },
+        {
+          "slug": "lima",
+          "label": "Lima",
+          "region": "Lima",
+          "aliases": [
+            "Lima"
+          ]
+        },
+        {
+          "slug": "piura-en-piura",
+          "label": "Piura, Piura",
+          "region": "Piura",
+          "city": "Piura",
+          "aliases": [
+            "Piura"
+          ]
+        },
+        {
+          "slug": "piura",
+          "label": "Piura",
+          "region": "Piura",
+          "aliases": [
+            "Piura"
+          ]
+        }
+      ]
+    },
+    "py": {
+      "label": "Paraguay",
+      "subdomain": "py",
+      "aliases": [
+        "paraguay",
+        "Paraguay"
+      ],
+      "locations": []
+    },
+    "sv": {
+      "label": "El Salvador",
+      "subdomain": "sv",
+      "aliases": [
+        "el salvador",
+        "salvador",
+        "El Salvador"
+      ],
+      "locations": [
+        {
+          "slug": "la-libertad",
+          "label": "La Libertad",
+          "region": "La Libertad",
+          "aliases": [
+            "La Libertad"
+          ]
+        },
+        {
+          "slug": "san-salvador-en-san-salvador",
+          "label": "San Salvador, San Salvador",
+          "region": "San Salvador",
+          "city": "San Salvador",
+          "aliases": [
+            "San Salvador"
+          ]
+        },
+        {
+          "slug": "san-salvador",
+          "label": "San Salvador",
+          "region": "San Salvador",
+          "aliases": [
+            "San Salvador"
+          ]
+        }
+      ]
+    },
+    "uy": {
+      "label": "Uruguay",
+      "subdomain": "uy",
+      "aliases": [
+        "uruguay",
+        "Uruguay"
+      ],
+      "locations": [
+        {
+          "slug": "montevideo-en-montevideo",
+          "label": "Montevideo, Montevideo",
+          "region": "Montevideo",
+          "city": "Montevideo",
+          "aliases": [
+            "Montevideo"
+          ]
+        },
+        {
+          "slug": "montevideo",
+          "label": "Montevideo",
+          "region": "Montevideo",
+          "aliases": [
+            "Montevideo"
+          ]
+        }
+      ]
+    },
+    "ve": {
+      "label": "Venezuela",
+      "subdomain": "ve",
+      "aliases": [
+        "venezuela",
+        "Venezuela"
+      ],
+      "locations": [
+        {
+          "slug": "aragua",
+          "label": "Aragua",
+          "region": "Aragua",
+          "aliases": [
+            "Aragua"
+          ]
+        },
+        {
+          "slug": "carabobo",
+          "label": "Carabobo",
+          "region": "Carabobo",
+          "aliases": [
+            "Carabobo"
+          ]
+        },
+        {
+          "slug": "distrito-capital-en-caracas",
+          "label": "Caracas, Distrito Capital",
+          "region": "Distrito Capital",
+          "city": "Caracas",
+          "aliases": [
+            "Caracas"
+          ]
+        },
+        {
+          "slug": "distrito-capital",
+          "label": "Distrito Capital",
+          "region": "Distrito Capital",
+          "aliases": [
+            "caracas",
+            "Distrito Capital"
+          ]
+        },
+        {
+          "slug": "miranda",
+          "label": "Miranda",
+          "region": "Miranda",
+          "aliases": [
+            "Miranda"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -14,13 +14,16 @@ LOGGER = logging.getLogger(__name__)
 
 LINKEDIN_ICON = "https://img.icons8.com/color/96/linkedin.png"
 CHILETRABAJOS_ICON = "https://s3.amazonaws.com/cht2/front/img/logo.png"
+COMPUTRABAJO_ICON = "https://cl.computrabajo.com/favicon.ico"
 SOURCE_COLORS = {
     "linkedin": discord.Colour.from_rgb(10, 102, 194),
     "chiletrabajos": discord.Colour.from_rgb(31, 83, 114),
+    "computrabajo": discord.Colour.from_rgb(242, 107, 33),
 }
 SOURCE_ICONS = {
     "linkedin": LINKEDIN_ICON,
     "chiletrabajos": CHILETRABAJOS_ICON,
+    "computrabajo": COMPUTRABAJO_ICON,
 }
 
 
