@@ -259,6 +259,9 @@ class HttpScraper(BaseScraper):
                 # it, so the proxy gets a single attempt.
                 attempts=0 if is_proxy else attempts,
                 label=label,
+                # With a proxy to fall back on, a connection that cannot even
+                # be opened (blocked IP) is not worth retrying.
+                fail_fast_connect=not is_proxy and len(targets) > 1,
             )
             if not is_proxy and self._proxy_mode() == "fallback":
                 self._note_direct_result(response, target_url)
@@ -280,6 +283,7 @@ class HttpScraper(BaseScraper):
         headers: dict[str, str] | None,
         attempts: int,
         label: str,
+        fail_fast_connect: bool = False,
     ) -> httpx.Response | None:
         """Run one transport's retry loop."""
         if self._circuit_is_open():
@@ -290,6 +294,38 @@ class HttpScraper(BaseScraper):
                 if headers and "X-Proxy-Token" in headers:
                     PROXY_BUDGET.spend()
                 response = await client.get(url, params=params, headers=headers)
+            except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+                if fail_fast_connect:
+                    LOGGER.warning(
+                        "%s %s could not connect directly: %r",
+                        self.source,
+                        label,
+                        exc,
+                    )
+                    return None
+                failures = getattr(self, "_transport_failures", 0) + 1
+                self._transport_failures = failures
+                if failures >= self.TRANSPORT_FAILURE_LIMIT:
+                    self._circuit_open = True
+                    LOGGER.warning(
+                        "%s circuit open after %d consecutive transport "
+                        "failures (last: %r)",
+                        self.source,
+                        failures,
+                        exc,
+                    )
+                    return None
+                if attempt >= attempts:
+                    LOGGER.warning(
+                        "%s %s failed after %d attempts: %r",
+                        self.source,
+                        label,
+                        attempt + 1,
+                        exc,
+                    )
+                    return None
+                await asyncio.sleep(self._retry_delay(None, attempt))
+                continue
             except httpx.TransportError as exc:
                 failures = getattr(self, "_transport_failures", 0) + 1
                 self._transport_failures = failures
