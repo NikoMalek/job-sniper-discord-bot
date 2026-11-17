@@ -1,7 +1,7 @@
 # Job Sniper Discord Bot
 
-Bot multi-servidor para detectar vacantes recientes de LinkedIn y ChileTrabajos
-y publicarlas en un canal de Discord.
+Bot multi-servidor para detectar vacantes recientes de LinkedIn, ChileTrabajos
+y Get on Board y publicarlas en un canal de Discord.
 
 ## Requisitos
 
@@ -43,6 +43,7 @@ El comportamiento actual es:
   conectarse directamente.
 - **LinkedIn**: intenta conectarse directamente y usa el Worker como fallback
   si recibe un bloqueo o un error temporal, como `429`.
+- **Get on Board**: se consulta directo, sin pasar por el Worker.
 
 El Worker solo reenvía peticiones `GET` hacia los hosts permitidos y requiere
 un token compartido con el bot.
@@ -60,6 +61,7 @@ un token compartido con el bot.
 |---|---|
 | ChileTrabajos | `always` |
 | LinkedIn | `fallback` |
+| Get on Board | `off` (conexión directa) |
 
 Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
 Worker valida además su lista `ALLOWED_HOSTS`. Si el Worker no está
@@ -148,9 +150,9 @@ Comandos:
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
-  desde una lista (`linkedin`, `chiletrabajos`). Cada servidor debe conservar
-  al menos uno activo. `/add-portal` rechaza un portal incompatible con las
-  ubicaciones actuales y explica cómo corregirlo.
+  desde una lista (`linkedin`, `chiletrabajos`, `getonbrd`). Cada servidor debe
+  conservar al menos uno activo. `/add-portal` rechaza un portal incompatible
+  con las ubicaciones actuales y explica cómo corregirlo.
 - `/list-portals`: muestra cada portal como `activo (✅)` o `pausado(⏸️)`, con la
   búsqueda resultante y su cobertura.
 - `/list-locations`: muestra las ubicaciones actuales, cómo se traducen en
@@ -240,3 +242,14 @@ normalmente basta la primera. Para ese portal conviene priorizar keywords de rol
 (`backend`, `frontend`, `desarrollador`, `programador`, `fullstack`, `devops`,
 `qa`) antes que términos genéricos como `informatica`. Requiere `tzdata` para
 interpretar las fechas de Chile en Windows.
+
+Get on Board se puede activar con `/add-portal` usando `getonbrd`. Usa su API
+pública (`https://www.getonbrd.com/api/v0/`), que no requiere token, y trae la
+descripción completa y la empresa en la misma búsqueda, así que no necesita una
+petición extra por aviso. La API no permite filtrar por país ni ciudad ni
+ordenar por fecha: el bot revisa hasta 3 páginas de 50 resultados por keyword y
+filtra localmente por antigüedad y ubicación. Cubre cualquier país, aunque su
+catálogo se concentra en Latinoamérica y ofertas remotas. Para `Remoto` se
+incluyen las remotas globales y las limitadas a un país; para `País` se incluyen
+las presenciales de ese país y las remotas disponibles para él. Ignora los
+avisos sin fecha y se consulta directo, sin pasar por el Worker del proxy.

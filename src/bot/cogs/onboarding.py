@@ -53,9 +53,9 @@ def build_setup_embed() -> discord.Embed:
         value=(
             "Por defecto busca ofertas de las últimas **24 horas** en "
             "**LinkedIn** y acepta todos los idiomas.\n"
-            "Puedes activar otros portales con "
-            "`/add-portal`. Para ajustar la antigüedad, empresas ignoradas, "
-            "idiomas y portales, usa `/help`."
+            "Puedes activar otros portales con `/add-portal` "
+            "(por ejemplo `chiletrabajos` o `getonbrd`). Para ajustar la "
+            "antigüedad, empresas ignoradas, idiomas y portales, usa `/help`."
         ),
         inline=False,
     )

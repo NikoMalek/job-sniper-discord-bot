@@ -474,7 +474,7 @@ class AdminCog(commands.Cog):
                 "Por defecto acepta todos los idiomas.\n"
                 "`/add-portal` y `/remove-portal` — activa o desactiva "
                 "portales. LinkedIn está activo por defecto y puedes sumar "
-                "otros como ChileTrabajos. Cada portal tiene su propia "
+                "ChileTrabajos o Get on Board. Cada portal tiene su propia "
                 "cobertura: si todas tus ubicaciones quedan fuera, se pausa "
                 "automáticamente.\n"
                 "`/add-blacklist-company` y `/remove-blacklist-company` — "
