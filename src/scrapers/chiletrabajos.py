@@ -90,7 +90,7 @@ class ChileTrabajosScraper(HttpScraper):
     DEFERRED_TTL_SECONDS = 3 * 60 * 60
     DEFERRED_LIMIT = 200
     DEFERRED_CONTEXT_LIMIT = 50
-    PROXY_MODE = "always"
+    PROXY_MODE = "fallback"
     PROXY_HOSTS = ("www.chiletrabajos.cl",)
 
     def __init__(self) -> None:

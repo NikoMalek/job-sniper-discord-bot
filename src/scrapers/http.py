@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import random
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
@@ -85,6 +86,9 @@ class HttpScraper(BaseScraper):
     REQUEST_TIMEOUT_SECONDS = 20.0
     CONNECT_TIMEOUT_SECONDS = 5.0
     TRANSPORT_FAILURE_LIMIT = 3
+    # After the direct path fails in "fallback" mode, go straight to the proxy
+    # for this long, then probe the direct path again.
+    DIRECT_COOLDOWN_SECONDS = 15 * 60
 
     # Outbound proxy (see worker/job-sniper-proxy.js).
     #   "off"      -> never use the proxy
@@ -164,7 +168,32 @@ class HttpScraper(BaseScraper):
             return [(url, {})]
         if mode == "always":
             return [(proxy_url, proxy_headers)]
+        if self._direct_cooling_down():
+            return [(proxy_url, proxy_headers)]
         return [(url, {}), (proxy_url, proxy_headers)]
+
+    def _direct_cooling_down(self) -> bool:
+        return time.monotonic() < getattr(self, "_direct_down_until", 0.0)
+
+    def _note_direct_result(
+        self, response: httpx.Response | None, url: str
+    ) -> None:
+        """Track whether the direct path works so it can recover on its own."""
+        if not self._proxy_worthy(response):
+            if getattr(self, "_direct_down_until", 0.0):
+                LOGGER.info("%s direct transport recovered", self.source)
+            self._direct_down_until = 0.0
+            return
+        if not self._direct_cooling_down():
+            LOGGER.warning(
+                "%s direct transport failed (%s) for %s; using the proxy for "
+                "%d min before probing direct again",
+                self.source,
+                "no response" if response is None else response.status_code,
+                urlsplit(url).path,
+                self.DIRECT_COOLDOWN_SECONDS // 60,
+            )
+        self._direct_down_until = time.monotonic() + self.DIRECT_COOLDOWN_SECONDS
 
     @staticmethod
     def _proxy_worthy(response: httpx.Response | None) -> bool:
@@ -231,6 +260,8 @@ class HttpScraper(BaseScraper):
                 attempts=0 if is_proxy else attempts,
                 label=label,
             )
+            if not is_proxy and self._proxy_mode() == "fallback":
+                self._note_direct_result(response, target_url)
             if response is not None:
                 last = response
                 if not self._proxy_worthy(response):
