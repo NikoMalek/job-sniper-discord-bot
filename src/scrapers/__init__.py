@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .base import BaseScraper, Job, PortalPlan
 from .chiletrabajos import ChileTrabajosScraper
+from .computrabajo import ComputrabajoScraper
 from .http import HttpScraper
 from .linkedin import LinkedInScraper
 
@@ -11,7 +12,11 @@ from .linkedin import LinkedInScraper
 #: caches (descriptions, per-cycle search results) keep working.
 SCRAPERS: dict[str, BaseScraper] = {
     scraper.slug: scraper
-    for scraper in (LinkedInScraper(), ChileTrabajosScraper())
+    for scraper in (
+        LinkedInScraper(),
+        ChileTrabajosScraper(),
+        ComputrabajoScraper(),
+    )
 }
 
 DEFAULT_PORTALS: tuple[str, ...] = ("linkedin",)
@@ -30,6 +35,7 @@ __all__ = [
     "SCRAPERS",
     "BaseScraper",
     "ChileTrabajosScraper",
+    "ComputrabajoScraper",
     "HttpScraper",
     "Job",
     "LinkedInScraper",
