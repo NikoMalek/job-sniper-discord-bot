@@ -20,6 +20,7 @@ from ...database import (
 from ...dedupe import group_jobs
 from ...locations import LocationError, parse_location
 from ...notifier import send_jobs
+from ...scrapers.http import PROXY_BUDGET
 from ...scrapers import SCRAPERS, BaseScraper, Job, get_scraper
 from lingua import Language, LanguageDetectorBuilder
 
@@ -95,6 +96,7 @@ class MonitorCog(commands.Cog):
                 removed,
                 NOTIFIED_RETENTION_HOURS,
             )
+        LOGGER.info("Proxy requests today (UTC): %d", PROXY_BUDGET.used)
         LOGGER.info(
             "Cycle scheduled in %.1fs; portals keep running in the background",
             time.monotonic() - started,

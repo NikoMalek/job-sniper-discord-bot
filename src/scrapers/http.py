@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import random
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import httpx
@@ -13,6 +14,61 @@ import httpx
 from .base import BaseScraper
 
 LOGGER = logging.getLogger(__name__)
+
+# Cloudflare Workers' free plan allows 100,000 requests per UTC day. Past that
+# the Worker answers with errors, so the bot stops using it a bit earlier and
+# falls back to direct requests until the counter resets at 00:00 UTC.
+PROXY_DAILY_LIMIT_ENV = "JOB_PROXY_DAILY_LIMIT"
+DEFAULT_PROXY_DAILY_LIMIT = 90_000
+
+
+class _ProxyBudget:
+    """Counts Worker requests per UTC day, shared by every scraper."""
+
+    def __init__(self) -> None:
+        self._day = ""
+        self._count = 0
+        self._warned = False
+
+    def _roll(self) -> None:
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if today != self._day:
+            self._day = today
+            self._count = 0
+            self._warned = False
+
+    @staticmethod
+    def limit() -> int:
+        try:
+            return int(os.getenv(PROXY_DAILY_LIMIT_ENV, "").strip())
+        except ValueError:
+            return DEFAULT_PROXY_DAILY_LIMIT
+
+    def available(self) -> bool:
+        self._roll()
+        limit = self.limit()
+        if limit <= 0 or self._count < limit:
+            return True
+        if not self._warned:
+            self._warned = True
+            LOGGER.warning(
+                "Proxy daily budget reached (%d requests); using direct "
+                "requests until 00:00 UTC",
+                self._count,
+            )
+        return False
+
+    def spend(self) -> None:
+        self._roll()
+        self._count += 1
+
+    @property
+    def used(self) -> int:
+        self._roll()
+        return self._count
+
+
+PROXY_BUDGET = _ProxyBudget()
 
 
 class HttpScraper(BaseScraper):
@@ -104,7 +160,7 @@ class HttpScraper(BaseScraper):
         if mode == "off":
             return [(url, {})]
         proxy_url, proxy_headers = self._proxy_request(url)
-        if not proxy_url:
+        if not proxy_url or not PROXY_BUDGET.available():
             return [(url, {})]
         if mode == "always":
             return [(proxy_url, proxy_headers)]
@@ -200,6 +256,8 @@ class HttpScraper(BaseScraper):
 
         for attempt in range(attempts + 1):
             try:
+                if headers and "X-Proxy-Token" in headers:
+                    PROXY_BUDGET.spend()
                 response = await client.get(url, params=params, headers=headers)
             except httpx.TransportError as exc:
                 failures = getattr(self, "_transport_failures", 0) + 1
