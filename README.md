@@ -1,7 +1,7 @@
 # Job Sniper Discord Bot
 
-Bot multi-servidor para detectar vacantes recientes de LinkedIn y ChileTrabajos
-y publicarlas en un canal de Discord.
+Bot multi-servidor para detectar vacantes recientes de LinkedIn, ChileTrabajos y
+Computrabajo y publicarlas en un canal de Discord.
 
 ## Requisitos
 
@@ -43,9 +43,13 @@ El comportamiento actual es:
   conectarse directamente.
 - **LinkedIn**: intenta conectarse directamente y usa el Worker como fallback
   si recibe un bloqueo o un error temporal, como `429`.
+- **Computrabajo**: igual que LinkedIn, intenta directo y usa el Worker como
+  fallback.
 
 El Worker solo reenvía peticiones `GET` hacia los hosts permitidos y requiere
-un token compartido con el bot.
+un token compartido con el bot. `ALLOWED_HOSTS` acepta hosts exactos y
+comodines de subdominio como `*.computrabajo.com`, que cubre todos los países
+del portal.
 
 ### Modos
 
@@ -60,6 +64,7 @@ un token compartido con el bot.
 |---|---|
 | ChileTrabajos | `always` |
 | LinkedIn | `fallback` |
+| Computrabajo | `fallback` |
 
 Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
 Worker valida además su lista `ALLOWED_HOSTS`. Si el Worker no está
@@ -134,8 +139,9 @@ Comandos:
 - `/set-location`: reemplaza tus ubicaciones por una sola, usando el formato
   estándar (ver [Ubicaciones](#ubicaciones)).
 - `/add-location` y `/remove-location`: agrega o quita ubicaciones. Se pueden
-  guardar hasta 3 y se combinan con lógica OR. Si quitas la última, se
-  restablece `Worldwide` automáticamente.
+  guardar hasta 3 y se combinan con lógica OR. Si quitas la última, quedan
+  **0/3**: `Worldwide` se usa solo por defecto, sin contar como ubicación
+  guardada.
 - `/set-max-age`: define cuántas horas hacia atrás buscar, desde 10 minutos
   (0.1667 horas) hasta 24 horas. Por ejemplo `0.5` son 30 minutos.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
@@ -148,14 +154,13 @@ Comandos:
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
-  desde una lista (`linkedin`, `chiletrabajos`). Cada servidor debe conservar
-  al menos uno activo. `/add-portal` rechaza un portal incompatible con las
-  ubicaciones actuales y explica cómo corregirlo.
+  desde una lista (`linkedin`, `chiletrabajos`, `computrabajo`). Cada servidor
+  debe conservar al menos uno activo. `/add-portal` rechaza un portal
+  incompatible con las ubicaciones actuales y explica cómo corregirlo.
 - `/list-portals`: muestra cada portal como `activo (✅)` o `pausado(⏸️)`, con la
   búsqueda resultante y su cobertura.
 - `/list-locations`: muestra las ubicaciones actuales, cómo se traducen en
-  cada portal, los formatos aceptados, las 58 ciudades chilenas y las
-  equivalencias.
+  cada portal y los formatos aceptados.
 - `/list-keywords`: muestra la configuración actual, incluidas las ubicaciones,
   los portales y su estado.
 - `/status`: muestra latencia, portales (con su estado) y número de avisos
@@ -197,7 +202,7 @@ en todos los países, y cada portal aporta lo que puede. También se aceptan
 
 ### Datos de países y ciudades
 
-Los datos editables viven en JSON; no hace falta tocar Python para agregar
+Los datos editables viven en JSON; permite agregar
 países, alias o equivalencias de ciudades:
 
 - `src/data/countries.json`
@@ -209,6 +214,13 @@ países, alias o equivalencias de ciudades:
   - `bucket` es el valor que usa ChileTrabajos para esa ciudad.
   - `aliases` agrega equivalencias, por ejemplo `"Viña del Mar"` dentro de
     `Valparaíso`.
+- `src/data/computrabajo_locations.json`
+  - `default_country`: país usado con `Worldwide`, `Remoto` o ubicaciones no
+    reconocidas (`CL` por defecto).
+  - `countries`: por código ISO, `label`, `subdomain`, `aliases` y `locations`.
+  - Cada `location` tiene `slug` (el segmento exacto que exige el portal),
+    `label`, `region`, `city` y `aliases`. El `slug` se usa textualmente:
+    `...-en-<slug>`, nunca se genera a partir de texto libre.
 
 Después de editar un JSON, reinicia el bot para que tome los cambios. Si el
 JSON tiene un error (por ejemplo, un alias apunta a un país inexistente), el
@@ -240,3 +252,61 @@ normalmente basta la primera. Para ese portal conviene priorizar keywords de rol
 (`backend`, `frontend`, `desarrollador`, `programador`, `fullstack`, `devops`,
 `qa`) antes que términos genéricos como `informatica`. Requiere `tzdata` para
 interpretar las fechas de Chile en Windows.
+
+ChileTrabajos **solo publica ofertas de Chile**. Si el servidor configura una
+ubicación de otro país, el portal busca en todo Chile y `/add-portal` y
+`/list-portals` muestran ese aviso.
+
+Computrabajo se activa con `/add-portal` (`computrabajo`) y cubre los países de
+como (`cl`, `ar`, `mx`, `pe`, `co`, `ec`, `uy`, `ve`,
+`gt`, `cr`, `pa`, `do`, `sv`, `hn`, `ni`, `bo` y `py`). **No admite texto libre
+para la ubicación**: cada país tiene un catálogo de slugs exactos extraídos de
+sus propios filtros, guardado en `src/data/computrabajo_locations.json`.
+
+El formato de la URL depende del país:
+
+- **Chile y Perú**: `-en-<región>-en-<ciudad>`.
+  `Santiago, Chile` → `-en-rmetropolitana-en-santiago-centro`;
+  `Concepción, Chile` → `-en-biobio-en-concepcion`;
+  `Trujillo, Perú` → `-en-la-libertad-en-trujillo`;
+  `Lima, Perú` → `-en-lima-en-lima`.
+- **México**: los slugs de ciudad son de un solo nivel e incluyen el contexto
+  del estado. `Guadalajara, México` → `-en-guadalajara`;
+  `Puebla, México` → `-en-puebla-ciudad`;
+  `Miguel Hidalgo, México` → `-en-miguel-hidalgo`.
+- **País solo** (`Chile`, `Perú`, `México`, ...): se usa el subdominio
+  correspondiente sin filtro de ubicación, por ejemplo
+  `pe.computrabajo.com/trabajo-de-python`.
+- Con `Worldwide` o `Remoto` se busca en todo Chile por defecto; con
+  `Remoto, México` se usa `mx.computrabajo.com`. Computrabajo no filtra por
+  modalidad, así que esas búsquedas incluyen ofertas presenciales y remotas.
+- Una ciudad que no esté en el catálogo de ese país no se convierte en slug:
+  se busca en todo el país y `/list-portals` lo advierte. Un país sin portal
+  (por ejemplo `España`) deja el portal **pausado (⏸️)**.
+
+Lee hasta 3 páginas por keyword, filtra por la fecha de la tarjeta antes de
+descargar cada aviso y usa el `JobPosting` del detalle para la descripción y la
+empresa. Revisa `MAX_PAGES_PER_KEYWORD` y `MAX_DETAILS_PER_CYCLE` en
+`src/scrapers/computrabajo.py`, y el JSON indicado arriba para agregar países,
+regiones, ciudades o alias.
+
+### Probar un portal sin Discord
+
+Para probar un scraper en local sin levantar el bot:
+
+```powershell
+@'
+import asyncio
+from src.scrapers.computrabajo import ComputrabajoScraper
+
+jobs = asyncio.run(
+    ComputrabajoScraper().fetch_jobs(["python"], "Santiago, Chile", max_age_hours=2)
+)
+for job in jobs:
+    print(job.published_at, "|", job.company, "|", job.title, "|", job.url)
+print("total:", len(jobs))
+'@ | .\.venv\Scripts\python.exe -
+```
+
+Cambia el portal importado (`chiletrabajos`, `linkedin`), la ubicación, las
+keywords y la antigüedad según lo que quieras revisar.
