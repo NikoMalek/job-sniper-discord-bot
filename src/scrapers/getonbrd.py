@@ -528,7 +528,7 @@ class GetOnBoardScraper(HttpScraper):
         known = known_job_ids or set()
         cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
         # Cache searches by whole hours so guilds with similar windows share
-        # them while keeping a safety margin before the exact cutoff.
+        # them; each guild still applies its exact cutoff afterwards.
         age_bucket = max(1, math.ceil(max_age_hours))
         context = (
             tuple(sorted(normalize(term) for term in terms)),
