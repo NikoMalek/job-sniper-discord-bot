@@ -22,24 +22,29 @@ GETONBRD_ICON = (
     "icon192-64920e83a21d9477c8d163577f6cd2f6691c9bcd0499e37325dcb1246709e3e8.png"
 )
 COMPUTRABAJO_ICON = "https://cl.computrabajo.com/c/img/logos/logoct-ogp.png"
+FIRSTJOB_ICON = "https://cdn.firstjob.me/asset-web/header_fj.png"
 SOURCE_COLORS = {
     "linkedin": discord.Colour.from_rgb(10, 102, 194),
     "chiletrabajos": discord.Colour.from_rgb(31, 83, 114),
     "computrabajo": discord.Colour.from_rgb(242, 107, 33),
     "get on board": discord.Colour.from_rgb(0, 147, 211),
+    "firstjob": discord.Colour.from_rgb(233, 64, 108),
 }
 SOURCE_ICONS = {
     "linkedin": LINKEDIN_ICON,
     "chiletrabajos": CHILETRABAJOS_ICON,
     "computrabajo": COMPUTRABAJO_ICON,
     "get on board": GETONBRD_ICON,
+    "firstjob": FIRSTJOB_ICON,
 }
 
 # Company logos served from these hosts are sometimes too slow for Discord's
 # image proxy, which ends up showing "an error occurred while loading the
 # image". We download them here and attach them to the message so Discord
 # serves them from the upload instead of fetching them externally.
-PREFETCH_LOGO_HOSTS = frozenset({"ii.ct-stc.com"})
+PREFETCH_LOGO_HOSTS = frozenset(
+    {"ii.ct-stc.com", "firstjob.me", "www.firstjob.me"}
+)
 LOGO_MAX_BYTES = 8 * 1024 * 1024
 LOGO_CONNECT_TIMEOUT_SECONDS = 3.0
 LOGO_READ_TIMEOUT_SECONDS = 6.0

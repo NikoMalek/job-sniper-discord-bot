@@ -11,8 +11,9 @@
  *   2. Settings -> Variables and Secrets -> add a Secret named PROXY_TOKEN
  *      with a long random value.
  *   3. Optional: add a variable ALLOWED_HOSTS with a comma-separated list of
- *      hosts (defaults to ChileTrabajos + LinkedIn + Computrabajo). Entries
- *      may be exact hosts or subdomain wildcards such as "*.computrabajo.com".
+ *      hosts (defaults to ChileTrabajos + LinkedIn + Computrabajo + FirstJob).
+ *      Entries may be exact hosts or subdomain wildcards such as
+ *      "*.computrabajo.com".
  *   4. Deploy. The Worker URL is https://<name>.<subdomain>.workers.dev.
  *   5. In the bot set:
  *        JOB_PROXY_URL=https://<name>.<subdomain>.workers.dev
@@ -26,7 +27,7 @@
 
 const ORIGIN_SCHEME = "https";
 const DEFAULT_ALLOWED_HOSTS =
-  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com,*.computrabajo.com";
+  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com,*.computrabajo.com,firstjob.me,www.firstjob.me";
 const UPSTREAM_TIMEOUT_MS = 25_000;
 const HOST_PATTERN = /^[a-z0-9.-]+$/;
 const FORWARDED_HEADERS = ["user-agent", "accept", "accept-language"];

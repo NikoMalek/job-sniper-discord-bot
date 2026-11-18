@@ -186,6 +186,11 @@
       "name_en": "Belize"
     },
     {
+      "code": "CAM",
+      "name_es": "Centroamérica",
+      "name_en": "Central America"
+    },
+    {
       "code": "CA",
       "name_es": "Canadá",
       "name_en": "Canada"
@@ -1277,6 +1282,7 @@
     }
   ],
   "aliases": {
+    "america central": "CAM",
     "corea del norte": "KP",
     "corea del sur": "KR",
     "e.e.u.u.": "US",
