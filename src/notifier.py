@@ -17,16 +17,22 @@ LOGGER = logging.getLogger(__name__)
 
 LINKEDIN_ICON = "https://img.icons8.com/color/96/linkedin.png"
 CHILETRABAJOS_ICON = "https://s3.amazonaws.com/cht2/front/img/logo.png"
+GETONBRD_ICON = (
+    "https://d2dgum4gsvdsrq.cloudfront.net/assets/"
+    "icon192-64920e83a21d9477c8d163577f6cd2f6691c9bcd0499e37325dcb1246709e3e8.png"
+)
 COMPUTRABAJO_ICON = "https://cl.computrabajo.com/c/img/logos/logoct-ogp.png"
 SOURCE_COLORS = {
     "linkedin": discord.Colour.from_rgb(10, 102, 194),
     "chiletrabajos": discord.Colour.from_rgb(31, 83, 114),
     "computrabajo": discord.Colour.from_rgb(242, 107, 33),
+    "get on board": discord.Colour.from_rgb(0, 147, 211),
 }
 SOURCE_ICONS = {
     "linkedin": LINKEDIN_ICON,
     "chiletrabajos": CHILETRABAJOS_ICON,
     "computrabajo": COMPUTRABAJO_ICON,
+    "get on board": GETONBRD_ICON,
 }
 
 # Company logos served from these hosts are sometimes too slow for Discord's
