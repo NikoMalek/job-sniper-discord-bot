@@ -1,7 +1,7 @@
 # Job Sniper Discord Bot
 
 Bot multi-servidor para detectar vacantes recientes de LinkedIn, ChileTrabajos,
-Computrabajo y Get on Board y publicarlas en un canal de Discord.
+Computrabajo, Get on Board y FirstJob, y publicarlas en un canal de Discord.
 
 ## Requisitos
 
@@ -46,11 +46,13 @@ El comportamiento actual es:
 - **Get on Board**: se consulta directo, sin pasar por el Worker.
 - **Computrabajo**: igual que LinkedIn, intenta directo y usa el Worker como
   fallback.
+- **FirstJob**: igual que LinkedIn y Computrabajo, intenta directo y usa el
+  Worker como fallback.
 
 El Worker solo reenvía peticiones `GET` hacia los hosts permitidos y requiere
 un token compartido con el bot. `ALLOWED_HOSTS` acepta hosts exactos y
 comodines de subdominio como `*.computrabajo.com`, que cubre todos los países
-del portal.
+del portal. Para FirstJob se permiten `firstjob.me` y `www.firstjob.me`.
 
 ### Modos
 
@@ -67,6 +69,7 @@ del portal.
 | LinkedIn | `fallback` |
 | Computrabajo | `fallback` |
 | Get on Board | `off` (conexión directa) |
+| FirstJob | `fallback` |
 
 Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
 Worker valida además su lista `ALLOWED_HOSTS`. Si el Worker no está
@@ -145,7 +148,9 @@ Comandos:
   **0/3**: `Worldwide` se usa solo por defecto, sin contar como ubicación
   guardada.
 - `/set-max-age`: define cuántas horas hacia atrás buscar, desde 10 minutos
-  (0.1667 horas) hasta 24 horas. Por ejemplo `0.5` son 30 minutos.
+  (0.1667 horas) hasta 24 horas. Por ejemplo `0.5` son 30 minutos. FirstJob no
+  aplica este ajuste porque el portal no publica fechas; el aviso aparece en
+  `/list-portals` y `/list-locations`.
 - `/add-keyword` y `/remove-keyword`: administra los términos de búsqueda.
   `/add-keyword` acepta varias keywords separadas por comas, por ejemplo:
   `backend, frontend, python`. `/remove-keyword` acepta el mismo formato.
@@ -156,9 +161,10 @@ Comandos:
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
-  desde una lista (`linkedin`, `chiletrabajos`, `computrabajo`, `getonbrd`).
-  Cada servidor debe conservar al menos uno activo. `/add-portal` rechaza un
-  portal incompatible con las ubicaciones actuales y explica cómo corregirlo.
+  desde una lista (`linkedin`, `chiletrabajos`, `computrabajo`, `getonbrd`,
+  `firstjob`). Cada servidor debe conservar al menos uno activo. `/add-portal`
+  rechaza un portal incompatible con las ubicaciones actuales y explica cómo
+  corregirlo.
 - `/list-portals`: muestra cada portal como `activo (✅)` o `pausado(⏸️)`, con la
   búsqueda resultante y su cobertura.
 - `/list-locations`: muestra las ubicaciones actuales, cómo se traducen en
@@ -211,6 +217,8 @@ países, alias o equivalencias de ciudades:
   - `countries`: lista de `{ "code", "name_es", "name_en" }`.
   - `aliases`: pares `"texto que escribe el usuario": "CÓDIGO"`. Se normalizan
     mayúsculas y acentos, así que `"EE.UU."` o `"eeuu"` funcionan igual.
+    También existe el código `CAM` (`Centroamérica`), porque FirstJob trata
+    Centroamérica como una sola búsqueda regional.
 - `src/data/chiletrabajos_cities.json`
   - Lista de `{ "name", "bucket", "region", "aliases" }`.
   - `bucket` es el valor que usa ChileTrabajos para esa ciudad.
@@ -223,6 +231,18 @@ países, alias o equivalencias de ciudades:
   - Cada `location` tiene `slug` (el segmento exacto que exige el portal),
     `label`, `region`, `city` y `aliases`. El `slug` se usa textualmente:
     `...-en-<slug>`, nunca se genera a partir de texto libre.
+- `src/data/firstjob_locations.json`
+  - `default_country`: país usado con `Worldwide`, `Remoto` o ubicaciones no
+    reconocidas (`CL` por defecto).
+  - `countries`: por código, `label`, `country_id` (el valor exacto de
+    `country[]`), `aliases`, `regions`, `note` y, solo para Centroamérica,
+    `countries_covered` y `country_codes_covered`.
+  - Cada `region` tiene `id` (el valor exacto de `region[]`), `label` y
+    `aliases`. FirstJob no usa comunas ni ciudades: una ciudad se resuelve a
+    una región cuando hay equivalencia y, si no, se busca todo el país.
+  - `CAM` no tiene regiones: sus países se documentan en `countries_covered` y
+    sus códigos ISO en `country_codes_covered`. Esos países también se pueden
+    usar como ubicación y se agrupan en la misma búsqueda `country[]=cam`.
 
 Después de editar un JSON, reinicia el bot para que tome los cambios. Si el
 JSON tiene un error (por ejemplo, un alias apunta a un país inexistente), el
@@ -233,6 +253,12 @@ historial de vacantes notificadas. El bot consulta las ofertas publicadas
 durante las últimas 24 horas y evita reenviar la misma vacante del mismo
 portal. El historial de avisos se purga automáticamente después de 25 horas
 para no llenar la base de datos.
+
+FirstJob es la excepción: el portal no publica fecha de publicación en el
+listado, en el detalle, en su API ni en feeds (no hay `datePublished`,
+`created_at`, `Last-Modified` ni parámetros de orden por fecha). Por eso no
+puede aplicar `max_age` y solo evita duplicados por ID de aviso. El bot lo
+indica en `/list-portals`, `/list-locations`, `/list-keywords` y `/status`.
 
 Si una misma vacante aparece en varios portales dentro del mismo ciclo, se envía
 un solo mensaje con un link por portal. Si aparece en otro portal en un ciclo
@@ -303,6 +329,38 @@ empresa. Revisa `MAX_PAGES_PER_KEYWORD` y `MAX_DETAILS_PER_CYCLE` en
 `src/scrapers/computrabajo.py`, y el JSON indicado arriba para agregar países,
 regiones, ciudades o alias.
 
+FirstJob se activa con `/add-portal` (`firstjob`) y cubre Chile (CL), Perú
+(PE), Colombia (CO), México (MX), Argentina (AR), Ecuador (EC) y Centroamérica
+(CAM, que agrupa Belice, Costa Rica, El Salvador, Guatemala, Honduras,
+Nicaragua y Panamá). Los códigos de esos países también se aceptan como
+ubicación y se agrupan en la misma búsqueda regional.
+
+A diferencia de los otros portales, **no usa comunas ni ciudades**: filtra por
+regiones con `country[]` y `region[]`. Los ids exactos viven en
+`src/data/firstjob_locations.json` y se pueden editar sin tocar Python:
+
+- `Santiago, Chile` → `country[]=43&region[]=13` (Región Metropolitana de
+  Santiago).
+- `Lima, Perú` → `country[]=168&region[]=94`.
+- `Bogotá, Colombia` → `country[]=47&region[]=119` (Cundinamarca).
+- `Chile` → `country[]=43`, sin `region[]`.
+- `Centroamérica` (o `Costa Rica`, `Guatemala`, ...) → `country[]=cam`, sin
+  región; se busca en toda la región.
+- Con `Worldwide` o `Remoto` se busca en Chile por defecto; con
+  `Remoto, México` se usa `country[]=138`. FirstJob no filtra por modalidad,
+  así que esas búsquedas pueden incluir ofertas presenciales.
+- Una ciudad sin equivalencia regional se busca en todo el país y
+  `/list-portals` lo advierte. Un país fuera del catálogo (por ejemplo
+  `España`) deja el portal **pausado (⏸️)**.
+
+Las URLs son `https://firstjob.me/ofertas?title=<keyword>&country[]=<id>` (con
+`region[]=<id>` y `page=<n>` cuando aplica). Lee hasta 3 páginas por keyword y
+hasta 25 detalles por ciclo. **FirstJob no publica fecha de publicación**, así
+que no se aplica `max_age`: el control de duplicados se hace por id de aviso
+(`known_job_ids`) y el embed muestra «Fecha no disponible». Para ampliar
+países, regiones o equivalencias, edita el JSON indicado arriba; los límites
+están en `src/scrapers/firstjob.py`.
+
 ### Probar un portal sin Discord
 
 Para probar un scraper en local sin levantar el bot:
@@ -322,5 +380,21 @@ print("total:", len(jobs))
 ```
 
 Cambia el portal importado (`chiletrabajos`, `linkedin`, `computrabajo`,
-`getonbrd`), la ubicación, las keywords y la antigüedad según lo que quieras
-revisar.
+`getonbrd`, `firstjob`), la ubicación, las keywords y la antigüedad según lo
+que quieras revisar. Por ejemplo, para FirstJob:
+
+```powershell
+@'
+import asyncio
+from src.scrapers.firstjob import FirstJobScraper
+
+jobs = asyncio.run(
+    FirstJobScraper().fetch_jobs(["desarrollador"], "Santiago, Chile")
+)
+for job in jobs:
+    print(job.location, "|", job.company, "|", job.title, "|", job.url)
+print("total:", len(jobs))
+'@ | .\.venv\Scripts\python.exe -
+```
+
+FirstJob ignora la antigüedad porque el portal no publica fechas.

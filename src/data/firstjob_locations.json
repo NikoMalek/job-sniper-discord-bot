@@ -1,0 +1,743 @@
+{
+  "default_country": "CL",
+  "countries": {
+    "CL": {
+      "label": "Chile",
+      "country_id": "43",
+      "aliases": [
+        "Chile"
+      ],
+      "regions": [
+        {
+          "id": "2",
+          "label": "Antofagasta",
+          "aliases": []
+        },
+        {
+          "id": "15",
+          "label": "Arica y Parinacota",
+          "aliases": []
+        },
+        {
+          "id": "3",
+          "label": "Atacama",
+          "aliases": []
+        },
+        {
+          "id": "4",
+          "label": "Coquimbo",
+          "aliases": []
+        },
+        {
+          "id": "49",
+          "label": "Ñuble",
+          "aliases": []
+        },
+        {
+          "id": "11",
+          "label": "Región Aisén del Gral. Carlos Ibáñez del Campo",
+          "aliases": []
+        },
+        {
+          "id": "9",
+          "label": "Región de la Araucanía",
+          "aliases": []
+        },
+        {
+          "id": "8",
+          "label": "Región del Biobío",
+          "aliases": []
+        },
+        {
+          "id": "6",
+          "label": "Región del Libertador Gral. Bernardo O’Higgins",
+          "aliases": []
+        },
+        {
+          "id": "7",
+          "label": "Región del Maule",
+          "aliases": []
+        },
+        {
+          "id": "10",
+          "label": "Región de Los Lagos",
+          "aliases": []
+        },
+        {
+          "id": "14",
+          "label": "Región de Los Ríos",
+          "aliases": []
+        },
+        {
+          "id": "12",
+          "label": "Región de Magallanes y de la Antártica Chilena",
+          "aliases": []
+        },
+        {
+          "id": "13",
+          "label": "Región Metropolitana de Santiago",
+          "aliases": [
+            "Santiago",
+            "RM",
+            "Región Metropolitana"
+          ]
+        },
+        {
+          "id": "1",
+          "label": "Tarapacá",
+          "aliases": []
+        },
+        {
+          "id": "5",
+          "label": "Valparaíso",
+          "aliases": []
+        }
+      ]
+    },
+    "PE": {
+      "label": "Perú",
+      "country_id": "168",
+      "aliases": [
+        "Perú",
+        "Peru"
+      ],
+      "regions": [
+        {
+          "id": "105",
+          "label": "Amazonas",
+          "aliases": []
+        },
+        {
+          "id": "81",
+          "label": "Áncash",
+          "aliases": []
+        },
+        {
+          "id": "82",
+          "label": "Apurímac",
+          "aliases": []
+        },
+        {
+          "id": "83",
+          "label": "Arequipa",
+          "aliases": []
+        },
+        {
+          "id": "84",
+          "label": "Ayacucho",
+          "aliases": []
+        },
+        {
+          "id": "85",
+          "label": "Cajamarca",
+          "aliases": []
+        },
+        {
+          "id": "86",
+          "label": "Callao",
+          "aliases": []
+        },
+        {
+          "id": "87",
+          "label": "Cusco",
+          "aliases": []
+        },
+        {
+          "id": "88",
+          "label": "Huancavelica",
+          "aliases": []
+        },
+        {
+          "id": "89",
+          "label": "Huánuco",
+          "aliases": []
+        },
+        {
+          "id": "90",
+          "label": "Ica",
+          "aliases": []
+        },
+        {
+          "id": "91",
+          "label": "Junín",
+          "aliases": []
+        },
+        {
+          "id": "92",
+          "label": "La Libertad",
+          "aliases": []
+        },
+        {
+          "id": "93",
+          "label": "Lambayeque",
+          "aliases": []
+        },
+        {
+          "id": "94",
+          "label": "Lima",
+          "aliases": [
+            "Lima"
+          ]
+        },
+        {
+          "id": "95",
+          "label": "Loreto",
+          "aliases": []
+        },
+        {
+          "id": "96",
+          "label": "Madre de Dios",
+          "aliases": []
+        },
+        {
+          "id": "97",
+          "label": "Moquegua",
+          "aliases": []
+        },
+        {
+          "id": "98",
+          "label": "Pasco",
+          "aliases": []
+        },
+        {
+          "id": "99",
+          "label": "Piura",
+          "aliases": []
+        },
+        {
+          "id": "100",
+          "label": "Puno",
+          "aliases": []
+        },
+        {
+          "id": "101",
+          "label": "San Martín",
+          "aliases": []
+        },
+        {
+          "id": "102",
+          "label": "Tacna",
+          "aliases": []
+        },
+        {
+          "id": "103",
+          "label": "Tumbes",
+          "aliases": []
+        },
+        {
+          "id": "104",
+          "label": "Ucayali",
+          "aliases": []
+        }
+      ]
+    },
+    "CO": {
+      "label": "Colombia",
+      "country_id": "47",
+      "aliases": [
+        "Colombia"
+      ],
+      "regions": [
+        {
+          "id": "106",
+          "label": "Amazonas",
+          "aliases": []
+        },
+        {
+          "id": "107",
+          "label": "Antioquia",
+          "aliases": []
+        },
+        {
+          "id": "108",
+          "label": "Arauca",
+          "aliases": []
+        },
+        {
+          "id": "109",
+          "label": "Atlántico",
+          "aliases": []
+        },
+        {
+          "id": "110",
+          "label": "Bolívar",
+          "aliases": []
+        },
+        {
+          "id": "111",
+          "label": "Boyacá",
+          "aliases": []
+        },
+        {
+          "id": "112",
+          "label": "Caldas",
+          "aliases": []
+        },
+        {
+          "id": "113",
+          "label": "Caquetá",
+          "aliases": []
+        },
+        {
+          "id": "114",
+          "label": "Casanare",
+          "aliases": []
+        },
+        {
+          "id": "115",
+          "label": "Cauca",
+          "aliases": []
+        },
+        {
+          "id": "116",
+          "label": "Cesar",
+          "aliases": []
+        },
+        {
+          "id": "117",
+          "label": "Chocó",
+          "aliases": []
+        },
+        {
+          "id": "118",
+          "label": "Córdoba",
+          "aliases": []
+        },
+        {
+          "id": "119",
+          "label": "Cundinamarca",
+          "aliases": [
+            "Bogotá",
+            "Bogota"
+          ]
+        },
+        {
+          "id": "120",
+          "label": "Guainía",
+          "aliases": []
+        },
+        {
+          "id": "121",
+          "label": "Guaviare",
+          "aliases": []
+        },
+        {
+          "id": "122",
+          "label": "Huila",
+          "aliases": []
+        },
+        {
+          "id": "123",
+          "label": "La Guajira",
+          "aliases": []
+        },
+        {
+          "id": "124",
+          "label": "Magdalena",
+          "aliases": []
+        },
+        {
+          "id": "125",
+          "label": "Meta",
+          "aliases": []
+        },
+        {
+          "id": "126",
+          "label": "Nariño",
+          "aliases": []
+        },
+        {
+          "id": "127",
+          "label": "Norte de Santander",
+          "aliases": []
+        },
+        {
+          "id": "128",
+          "label": "Putumayo",
+          "aliases": []
+        },
+        {
+          "id": "129",
+          "label": "Quindío",
+          "aliases": []
+        },
+        {
+          "id": "130",
+          "label": "Risaralda",
+          "aliases": []
+        },
+        {
+          "id": "131",
+          "label": "San Andrés y Providencia",
+          "aliases": []
+        },
+        {
+          "id": "132",
+          "label": "Santander",
+          "aliases": []
+        },
+        {
+          "id": "133",
+          "label": "Sucre",
+          "aliases": []
+        },
+        {
+          "id": "134",
+          "label": "Tolima",
+          "aliases": []
+        },
+        {
+          "id": "135",
+          "label": "Valle del Cauca",
+          "aliases": []
+        },
+        {
+          "id": "136",
+          "label": "Vaupés",
+          "aliases": []
+        },
+        {
+          "id": "137",
+          "label": "Vichada",
+          "aliases": []
+        }
+      ]
+    },
+    "MX": {
+      "label": "México",
+      "country_id": "138",
+      "aliases": [
+        "México",
+        "Mexico"
+      ],
+      "regions": [
+        {
+          "id": "76",
+          "label": "Aguascalientes",
+          "aliases": []
+        },
+        {
+          "id": "77",
+          "label": "Baja California",
+          "aliases": []
+        },
+        {
+          "id": "78",
+          "label": "Baja California Sur",
+          "aliases": []
+        },
+        {
+          "id": "79",
+          "label": "Campeche",
+          "aliases": []
+        },
+        {
+          "id": "80",
+          "label": "Chiapas",
+          "aliases": []
+        },
+        {
+          "id": "51",
+          "label": "Chihuahua",
+          "aliases": []
+        },
+        {
+          "id": "52",
+          "label": "Coahuila",
+          "aliases": []
+        },
+        {
+          "id": "53",
+          "label": "Colima",
+          "aliases": []
+        },
+        {
+          "id": "54",
+          "label": "Durango",
+          "aliases": []
+        },
+        {
+          "id": "59",
+          "label": "Estado de México",
+          "aliases": []
+        },
+        {
+          "id": "55",
+          "label": "Guanajuato",
+          "aliases": []
+        },
+        {
+          "id": "56",
+          "label": "Guerrero",
+          "aliases": []
+        },
+        {
+          "id": "57",
+          "label": "Hidalgo",
+          "aliases": []
+        },
+        {
+          "id": "58",
+          "label": "Jalisco",
+          "aliases": []
+        },
+        {
+          "id": "60",
+          "label": "Michoacán",
+          "aliases": []
+        },
+        {
+          "id": "61",
+          "label": "Morelos",
+          "aliases": []
+        },
+        {
+          "id": "62",
+          "label": "Nayarit",
+          "aliases": []
+        },
+        {
+          "id": "63",
+          "label": "Nuevo León",
+          "aliases": []
+        },
+        {
+          "id": "64",
+          "label": "Oaxaca",
+          "aliases": []
+        },
+        {
+          "id": "65",
+          "label": "Puebla",
+          "aliases": []
+        },
+        {
+          "id": "66",
+          "label": "Querétaro",
+          "aliases": []
+        },
+        {
+          "id": "67",
+          "label": "Quintana Roo",
+          "aliases": []
+        },
+        {
+          "id": "68",
+          "label": "San Luis Potosí",
+          "aliases": []
+        },
+        {
+          "id": "69",
+          "label": "Sinaloa",
+          "aliases": []
+        },
+        {
+          "id": "70",
+          "label": "Sonora",
+          "aliases": []
+        },
+        {
+          "id": "71",
+          "label": "Tabasco",
+          "aliases": []
+        },
+        {
+          "id": "72",
+          "label": "Tamaulipas",
+          "aliases": []
+        },
+        {
+          "id": "73",
+          "label": "Tlaxcala",
+          "aliases": []
+        },
+        {
+          "id": "74",
+          "label": "Veracruz",
+          "aliases": []
+        },
+        {
+          "id": "75",
+          "label": "Yucatán",
+          "aliases": []
+        },
+        {
+          "id": "50",
+          "label": "Zacatecas",
+          "aliases": []
+        }
+      ]
+    },
+    "AR": {
+      "label": "Argentina",
+      "country_id": "10",
+      "aliases": [
+        "Argentina"
+      ],
+      "regions": [
+        {
+          "id": "23",
+          "label": "Buenos Aires",
+          "aliases": [
+            "Buenos Aires"
+          ]
+        },
+        {
+          "id": "22",
+          "label": "Capital Federal",
+          "aliases": []
+        },
+        {
+          "id": "24",
+          "label": "Catamarca",
+          "aliases": []
+        },
+        {
+          "id": "27",
+          "label": "Chaco",
+          "aliases": []
+        },
+        {
+          "id": "28",
+          "label": "Chubut",
+          "aliases": []
+        },
+        {
+          "id": "25",
+          "label": "Cordoba",
+          "aliases": []
+        },
+        {
+          "id": "26",
+          "label": "Corrientes",
+          "aliases": []
+        },
+        {
+          "id": "29",
+          "label": "Entre Rios",
+          "aliases": []
+        },
+        {
+          "id": "30",
+          "label": "Formosa",
+          "aliases": []
+        },
+        {
+          "id": "31",
+          "label": "Jujuy",
+          "aliases": []
+        },
+        {
+          "id": "32",
+          "label": "La Pampa",
+          "aliases": []
+        },
+        {
+          "id": "33",
+          "label": "La Rioja",
+          "aliases": []
+        },
+        {
+          "id": "34",
+          "label": "Mendoza",
+          "aliases": []
+        },
+        {
+          "id": "35",
+          "label": "Misiones",
+          "aliases": []
+        },
+        {
+          "id": "36",
+          "label": "Neuquen",
+          "aliases": []
+        },
+        {
+          "id": "37",
+          "label": "Rio Negro",
+          "aliases": []
+        },
+        {
+          "id": "38",
+          "label": "Salta",
+          "aliases": []
+        },
+        {
+          "id": "39",
+          "label": "San Juan",
+          "aliases": []
+        },
+        {
+          "id": "40",
+          "label": "San Luis",
+          "aliases": []
+        },
+        {
+          "id": "41",
+          "label": "Santa Cruz",
+          "aliases": []
+        },
+        {
+          "id": "42",
+          "label": "Santa Fe",
+          "aliases": []
+        },
+        {
+          "id": "43",
+          "label": "Santiago Del Estero",
+          "aliases": []
+        },
+        {
+          "id": "44",
+          "label": "Tierra Del Fuego",
+          "aliases": []
+        },
+        {
+          "id": "45",
+          "label": "Tucuman",
+          "aliases": []
+        }
+      ]
+    },
+    "EC": {
+      "label": "Ecuador",
+      "country_id": "62",
+      "aliases": [
+        "Ecuador"
+      ],
+      "regions": [],
+      "note": "FirstJob no publica regiones para Ecuador; la búsqueda es a nivel país."
+    },
+    "CAM": {
+      "label": "Centroamérica",
+      "country_id": "cam",
+      "aliases": [
+        "Centroamérica",
+        "Centroamerica",
+        "América Central",
+        "America Central",
+        "CAM"
+      ],
+      "regions": [],
+      "countries_covered": [
+        "Belice",
+        "Costa Rica",
+        "El Salvador",
+        "Guatemala",
+        "Honduras",
+        "Nicaragua",
+        "Panamá"
+      ],
+      "country_codes_covered": [
+        "BZ",
+        "CR",
+        "SV",
+        "GT",
+        "HN",
+        "NI",
+        "PA"
+      ],
+      "note": "FirstJob ofrece Centroamérica como una sola opción, sin filtros por región. La búsqueda cubre toda la región; los países incluidos son los de América Central y se pueden editar en countries_covered y country_codes_covered."
+    }
+  }
+}
