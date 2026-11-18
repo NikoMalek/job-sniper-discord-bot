@@ -11,7 +11,8 @@
  *   2. Settings -> Variables and Secrets -> add a Secret named PROXY_TOKEN
  *      with a long random value.
  *   3. Optional: add a variable ALLOWED_HOSTS with a comma-separated list of
- *      hosts (defaults to ChileTrabajos + LinkedIn).
+ *      hosts (defaults to ChileTrabajos + LinkedIn + Computrabajo). Entries
+ *      may be exact hosts or subdomain wildcards such as "*.computrabajo.com".
  *   4. Deploy. The Worker URL is https://<name>.<subdomain>.workers.dev.
  *   5. In the bot set:
  *        JOB_PROXY_URL=https://<name>.<subdomain>.workers.dev
@@ -25,7 +26,7 @@
 
 const ORIGIN_SCHEME = "https";
 const DEFAULT_ALLOWED_HOSTS =
-  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com";
+  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com,*.computrabajo.com";
 const UPSTREAM_TIMEOUT_MS = 25_000;
 const HOST_PATTERN = /^[a-z0-9.-]+$/;
 const FORWARDED_HEADERS = ["user-agent", "accept", "accept-language"];
@@ -46,6 +47,17 @@ function allowedHosts(env) {
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);
+}
+
+// An entry is either an exact host or a subdomain wildcard such as
+// "*.computrabajo.com".
+function isAllowedHost(host, allowed) {
+  return allowed.some((entry) => {
+    if (entry.startsWith("*.")) {
+      return host.endsWith(entry.slice(1));
+    }
+    return host === entry;
+  });
 }
 
 export default {
@@ -73,7 +85,7 @@ export default {
     if (!HOST_PATTERN.test(host)) {
       return text(400, "invalid X-Target-Host");
     }
-    if (!allowedHosts(env).includes(host)) {
+    if (!isAllowedHost(host, allowedHosts(env))) {
       return text(403, "host not allowed: " + host);
     }
 

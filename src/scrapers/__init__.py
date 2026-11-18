@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .base import BaseScraper, Job, PortalPlan
 from .chiletrabajos import ChileTrabajosScraper
+from .computrabajo import ComputrabajoScraper
 from .getonbrd import GetOnBoardScraper
 from .http import HttpScraper
 from .linkedin import LinkedInScraper
@@ -15,6 +16,7 @@ SCRAPERS: dict[str, BaseScraper] = {
     for scraper in (
         LinkedInScraper(),
         ChileTrabajosScraper(),
+        ComputrabajoScraper(),
         GetOnBoardScraper(),
     )
 }
@@ -35,6 +37,7 @@ __all__ = [
     "SCRAPERS",
     "BaseScraper",
     "ChileTrabajosScraper",
+    "ComputrabajoScraper",
     "GetOnBoardScraper",
     "HttpScraper",
     "Job",
