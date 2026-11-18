@@ -100,20 +100,38 @@ Así las pruebas locales nunca pasan por el Worker.
 
 ## Flujo de contribución
 
-Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
+Se utilizan dos ramas principales:
+
+- `main`: representa producción. Esta protegida y no se debe trabajar
+  directamente sobre ella.
+- `develop`: rama de integración y pruebas antes de publicar en producción.
+
+Las ramas temporales se crean así:
+
+- `feature/nombre-del-cambio`: nuevas funcionalidades, desde `develop`.
+- `fix/nombre-del-cambio`: correcciones normales, desde `develop`.
+- `hotfix/nombre-del-cambio`: correcciones urgentes de producción, desde
+  `main`.
+
+### Features y fixes normales
+
+Para cada cambio que no sea urgente:
 
 1. Actualiza tu copia local:
 
    ```powershell
-   git checkout main
-   git pull origin main
+   git checkout develop
+   git pull origin develop
    ```
 
-2. Crea una rama descriptiva:
+2. Crea una rama descriptiva desde `develop`:
 
    ```powershell
    git checkout -b feature/nombre-del-cambio
    ```
+
+   Para una corrección normal, usa `fix/nombre-del-cambio` en lugar de
+   `feature/nombre-del-cambio`.
 
 3. Implementa y valida el cambio.
 4. Guarda los cambios y publica la rama:
@@ -124,8 +142,29 @@ Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
    git push -u origin feature/nombre-del-cambio
    ```
 
-5. Abre un Pull Request hacia `main`, espera la revisión y fusiónalo solo
-   después de que pasen las validaciones.
+   Si usaste una rama `fix`, reemplaza el nombre en el comando.
+
+5. Abre un Pull Request hacia `develop`. Después de la revisión y de que
+   pasen las validaciones, fusiona el cambio en `develop`.
+6. Cuando `develop` esté validada, abre un Pull Request de `develop` hacia
+   `main` para publicar en producción.
+
+### Correcciones urgentes en producción
+
+Si el problema está en producción y no puede esperar al ciclo normal:
+
+1. Actualiza `main` y crea una rama `hotfix` desde ella:
+
+   ```powershell
+   git checkout main
+   git pull origin main
+   git checkout -b hotfix/nombre-del-cambio
+   ```
+
+2. Implementa, valida y abre un Pull Request hacia `main`.
+3. Después de fusionar el hotfix en `main`, incorpora también esos cambios en
+   `develop` para evitar que la corrección se pierda en la siguiente
+   publicación.
 
 ## Uso
 
