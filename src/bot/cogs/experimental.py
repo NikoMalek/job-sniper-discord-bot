@@ -720,21 +720,24 @@ class ExperimentalCog(commands.Cog):
             return
         enabled = not await self.database.is_experimental_enabled(guild_id)
         await self.database.set_experimental_enabled(guild_id, enabled)
-        sync_ok = True
+        # Update the button before the slow sync: this is what acknowledges the
+        # deferred interaction, so the user sees the new state immediately.
+        await interaction.edit_original_response(
+            embed=self._status_embed(guild_id, enabled, language),
+            view=self._toggle_view(guild_id, enabled, language),
+        )
         try:
             await self.bot.sync_experimental_commands(guild_id, enabled)
         except discord.HTTPException:
-            sync_ok = False
             LOGGER.exception(
                 "Could not sync experimental commands in guild %s", guild_id
             )
-        embed = self._status_embed(guild_id, enabled, language)
-        if not sync_ok:
+            embed = self._status_embed(guild_id, enabled, language)
             embed.set_footer(text=tracking_text("sync_fallback", language))
-        await interaction.edit_original_response(
-            embed=embed,
-            view=self._toggle_view(guild_id, enabled, language),
-        )
+            await interaction.edit_original_response(
+                embed=embed,
+                view=self._toggle_view(guild_id, enabled, language),
+            )
 
     async def cog_app_command_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
