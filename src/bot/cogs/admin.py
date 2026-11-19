@@ -36,6 +36,14 @@ PORTAL_CHOICES = [
     app_commands.Choice(name=scraper.source, value=slug)
     for slug, scraper in SCRAPERS.items()
 ]
+
+
+def _portal_label(source: str) -> str:
+    """Human-readable portal name for a configured slug."""
+    scraper = SCRAPERS.get(source)
+    return scraper.source if scraper is not None else source
+
+
 LANGUAGE_CHOICES = [
     app_commands.Choice(name=f"{label.title()} ({language})", value=language)
     for language, label in LANGUAGE_LABELS.items()
@@ -441,6 +449,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(name="help", description="Muestra cómo configurar Job Sniper.")
     @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
     async def help_command(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
             title="Ayuda de Job Sniper",
@@ -489,6 +498,14 @@ class AdminCog(commands.Cog):
                 "`/list-portals` o `/list-locations` para revisar cada "
                 "sección. `/status` muestra un resumen general y confirma "
                 "si el bot está listo."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🧪 Experimental Zone",
+            value=(
+                "Usa `/experimental` para revisar y activar las funciones "
+                "experimentales."
             ),
             inline=False,
         )
@@ -589,17 +606,17 @@ class AdminCog(commands.Cog):
         name="remove-portal",
         description="Desactiva un portal de empleo de este servidor.",
     )
-    @app_commands.describe(portal="Portal que quieres desactivar.")
-    @app_commands.choices(portal=PORTAL_CHOICES)
+    @app_commands.describe(portal="Portal activo o pausado que quieres desactivar.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
     async def remove_portal(
-        self, interaction: discord.Interaction, portal: app_commands.Choice[str]
+        self, interaction: discord.Interaction, portal: str
     ) -> None:
         config = await self.database.get_guild_config(interaction.guild_id or 0)
-        if portal.value not in config.portals:
+        label = _portal_label(portal)
+        if portal not in config.portals:
             await interaction.response.send_message(
-                f"El portal **{portal.name}** no estaba activo.",
+                f"El portal **{label}** no estaba activo.",
                 ephemeral=True,
             )
             return
@@ -610,14 +627,29 @@ class AdminCog(commands.Cog):
             )
             return
         removed = await self.database.remove_portal(
-            interaction.guild_id or 0, portal.value
+            interaction.guild_id or 0, portal
         )
         message = (
-            f"Portal desactivado: **{portal.name}**."
+            f"Portal desactivado: **{label}**."
             if removed
-            else f"El portal **{portal.name}** no estaba activo."
+            else f"El portal **{label}** no estaba activo."
         )
         await interaction.response.send_message(message, ephemeral=True)
+
+    @remove_portal.autocomplete("portal")
+    async def remove_portal_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        if interaction.guild_id is None:
+            return []
+        config = await self.database.get_guild_config(interaction.guild_id)
+        normalized = current.casefold().strip()
+        return [
+            app_commands.Choice(name=_portal_label(slug), value=slug)
+            for slug in config.portals
+            if normalized in _portal_label(slug).casefold()
+            or normalized in slug.casefold()
+        ][:25]
 
     @app_commands.command(
         name="list-languages",

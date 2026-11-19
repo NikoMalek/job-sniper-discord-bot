@@ -27,7 +27,7 @@
 
 const ORIGIN_SCHEME = "https";
 const DEFAULT_ALLOWED_HOSTS =
-  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com,*.computrabajo.com,firstjob.me,www.firstjob.me";
+  "www.chiletrabajos.cl,www.linkedin.com,cl.linkedin.com,*.computrabajo.com,firstjob.me,www.firstjob.me,www.getonbrd.com";
 const UPSTREAM_TIMEOUT_MS = 25_000;
 const HOST_PATTERN = /^[a-z0-9.-]+$/;
 const FORWARDED_HEADERS = ["user-agent", "accept", "accept-language"];

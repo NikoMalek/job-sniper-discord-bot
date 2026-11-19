@@ -18,6 +18,7 @@ from ...database import (
     GuildMonitorConfig,
 )
 from ...dedupe import group_jobs
+from ...languages import preferred_ui_language
 from ...locations import LocationError, parse_location
 from ...notifier import send_jobs
 from ...scrapers import SCRAPERS, BaseScraper, Job, get_scraper
@@ -93,6 +94,13 @@ class MonitorCog(commands.Cog):
             LOGGER.info(
                 "Pruned %d notification records older than %.0f hours",
                 removed,
+                NOTIFIED_RETENTION_HOURS,
+            )
+        expired_tokens = await self.database.cleanup_tracked_jobs()
+        if expired_tokens:
+            LOGGER.info(
+                "Pruned %d tracking tokens older than %.0f hours",
+                expired_tokens,
                 NOTIFIED_RETENTION_HOURS,
             )
         LOGGER.info(
@@ -489,7 +497,13 @@ class MonitorCog(commands.Cog):
             if not fresh:
                 continue
 
-            if await send_jobs(channel, fresh):
+            if await send_jobs(
+                channel,
+                fresh,
+                guild_id=config.guild_id,
+                language=preferred_ui_language(config.languages),
+                database=self.database,
+            ):
                 counters["sent_messages"] += 1
                 counters["sent_variants"] += len(fresh)
                 for job in fresh:

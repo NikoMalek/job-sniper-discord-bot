@@ -80,6 +80,11 @@ class GetOnBoardScraper(HttpScraper):
     # filtered locally. Jobs are posted from many countries, not only Chile.
     COVERED_COUNTRIES = None
 
+    # Try the public API directly first and fall back to the Worker when the
+    # direct path is blocked or fails temporarily (429/5xx/network error).
+    PROXY_MODE = "fallback"
+    PROXY_HOSTS = ("www.getonbrd.com",)
+
     PAGE_SIZE = 50
     MAX_PAGES_PER_KEYWORD = 3
     SEARCH_PAGE_DELAY_RANGE = (0.4, 0.9)
