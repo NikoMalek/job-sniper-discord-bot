@@ -646,12 +646,14 @@ class ExperimentalCog(commands.Cog):
         paginator = DebugPaginator(self, interaction, language, clean_source, total)
         embed = await paginator.build_embed()
         if paginator.pages > 1:
-            await interaction.response.send_message(embed=embed, view=paginator)
+            await interaction.response.send_message(
+                embed=embed, view=paginator, ephemeral=True
+            )
             paginator.message = await interaction.original_response()
         else:
             # Passing view=None explicitly makes discord.py call
             # None.is_finished(), so omit the keyword entirely here.
-            await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @debug.autocomplete("source")
     async def debug_source_autocomplete(
