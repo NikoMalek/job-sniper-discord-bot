@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 JOB_TRACK_PREFIX = "job_track:"
-EXPERIMENTAL_TOGGLE_PREFIX = "experimental_toggle:"
 PAGE_SIZE = 5
 RANK_MEDALS = ("🥇", "🥈", "🥉")
+EXPERIMENTAL_ACTIONS = ("activar", "desactivar")
 
 
 def _display(value: str, fallback: str, limit: int) -> str:
@@ -444,6 +444,22 @@ class DebugPaginator(ui.View):
                 pass
 
 
+async def experimental_action_autocomplete(
+    interaction: discord.Interaction, current: str
+) -> list[app_commands.Choice[str]]:
+    """Suggest only the action that applies to the guild's current state."""
+    enabled = await interaction.client.database.is_experimental_enabled(
+        interaction.guild_id or 0
+    )
+    available = ("desactivar",) if enabled else ("activar",)
+    needle = current.strip().lower()
+    return [
+        app_commands.Choice(name=action.capitalize(), value=action)
+        for action in available
+        if needle in action
+    ]
+
+
 class ExperimentalCog(commands.Cog):
     """Opt-in click tracking, application answers and per-guild leaderboards."""
 
@@ -474,25 +490,6 @@ class ExperimentalCog(commands.Cog):
         )
         return embed
 
-    def _toggle_view(
-        self, guild_id: int, enabled: bool, language: str
-    ) -> discord.ui.View:
-        label = tracking_text(
-            "disable_button" if enabled else "enable_button", language
-        )
-        style = (
-            discord.ButtonStyle.danger if enabled else discord.ButtonStyle.success
-        )
-        view = discord.ui.View(timeout=None)
-        view.add_item(
-            discord.ui.Button(
-                label=label,
-                style=style,
-                custom_id=f"{EXPERIMENTAL_TOGGLE_PREFIX}{guild_id}",
-            )
-        )
-        return view
-
     @staticmethod
     def _ranking_lines(rows, language: str) -> str:
         """One unified list: medals for the podium, numbers afterwards."""
@@ -522,19 +519,54 @@ class ExperimentalCog(commands.Cog):
 
     @app_commands.command(
         name="experimental",
-        description="Activa o desactiva la Zona Experimental en este servidor.",
+        description=(
+            "Muestra información y estado; usa accion para activar o desactivar "
+            "la Zona Experimental."
+        ),
     )
+    @app_commands.describe(
+        accion="Elige solo la acción disponible según el estado actual."
+    )
+    @app_commands.autocomplete(accion=experimental_action_autocomplete)
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
-    async def experimental(self, interaction: discord.Interaction) -> None:
+    async def experimental(
+        self,
+        interaction: discord.Interaction,
+        accion: str | None = None,
+    ) -> None:
         guild_id = interaction.guild_id or 0
-        enabled = await self.database.is_experimental_enabled(guild_id)
         language = await self._language(guild_id)
-        await interaction.response.send_message(
-            embed=self._status_embed(guild_id, enabled, language),
-            view=self._toggle_view(guild_id, enabled, language),
-            ephemeral=True,
-        )
+        enabled = await self.database.is_experimental_enabled(guild_id)
+        if accion is None:
+            await interaction.response.send_message(
+                embed=self._status_embed(guild_id, enabled, language),
+                ephemeral=True,
+            )
+            return
+        value = accion.strip().lower()
+        if value not in EXPERIMENTAL_ACTIONS:
+            await interaction.response.send_message(
+                tracking_text("command_error", language), ephemeral=True
+            )
+            return
+        target = value == "activar"
+        embed = self._status_embed(guild_id, target, language)
+        if target == enabled:
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        # Answer immediately with the final state; the sync below cannot leave
+        # Discord stuck on the "thinking" placeholder.
+        await self.database.set_experimental_enabled(guild_id, target)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            await self.bot.sync_experimental_commands(guild_id, target)
+        except discord.HTTPException:
+            LOGGER.exception(
+                "Could not sync experimental commands in guild %s", guild_id
+            )
+            embed.set_footer(text=tracking_text("sync_fallback", language))
+            await interaction.edit_original_response(embed=embed)
 
     @app_commands.command(
         name="snipers",
@@ -542,6 +574,7 @@ class ExperimentalCog(commands.Cog):
     )
     @app_commands.guilds()
     @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
     async def snipers(self, interaction: discord.Interaction) -> None:
         guild_id = interaction.guild_id or 0
         language = await self._language(guild_id)
@@ -648,10 +681,6 @@ class ExperimentalCog(commands.Cog):
                 await self._handle_job_track(
                     interaction, custom_id[len(JOB_TRACK_PREFIX) :]
                 )
-            elif custom_id.startswith(EXPERIMENTAL_TOGGLE_PREFIX):
-                await self._handle_toggle(
-                    interaction, custom_id[len(EXPERIMENTAL_TOGGLE_PREFIX) :]
-                )
         except (ValueError, discord.HTTPException) as error:
             if isinstance(error, discord.NotFound) or interaction.is_expired():
                 # Responding again with an expired token only raises another
@@ -698,42 +727,6 @@ class ExperimentalCog(commands.Cog):
         )
         await interaction.response.send_modal(
             JobTrackingModal(self, interaction, tracked, language, record_id)
-        )
-
-    async def _handle_toggle(
-        self, interaction: discord.Interaction, raw_guild_id: str
-    ) -> None:
-        # Acknowledge immediately: the sync below can exceed Discord's 3s
-        # window, and every later update must use the followup/webhook path.
-        await interaction.response.defer()
-        guild_id = int(raw_guild_id)
-        if interaction.guild_id != guild_id:
-            return
-        language = await self._language(guild_id)
-        if (
-            not isinstance(interaction.user, discord.Member)
-            or not interaction.user.guild_permissions.manage_guild
-        ):
-            await interaction.followup.send(
-                tracking_text("no_permission", language), ephemeral=True
-            )
-            return
-        enabled = not await self.database.is_experimental_enabled(guild_id)
-        await self.database.set_experimental_enabled(guild_id, enabled)
-        sync_ok = True
-        try:
-            await self.bot.sync_experimental_commands(guild_id, enabled)
-        except discord.HTTPException:
-            sync_ok = False
-            LOGGER.exception(
-                "Could not sync experimental commands in guild %s", guild_id
-            )
-        embed = self._status_embed(guild_id, enabled, language)
-        if not sync_ok:
-            embed.set_footer(text=tracking_text("sync_fallback", language))
-        await interaction.edit_original_response(
-            embed=embed,
-            view=self._toggle_view(guild_id, enabled, language),
         )
 
     async def cog_app_command_error(

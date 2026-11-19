@@ -504,8 +504,9 @@ class AdminCog(commands.Cog):
         embed.add_field(
             name="🧪 Experimental Zone",
             value=(
-                "Usa `/experimental` para revisar y activar las funciones "
-                "experimentales."
+                "Usa `/experimental` para ver la información y el estado de la "
+                "Zona Experimental; con `/experimental accion:activar` o "
+                "`accion:desactivar` puedes cambiarlo."
             ),
             inline=False,
         )
