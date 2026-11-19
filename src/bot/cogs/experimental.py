@@ -503,7 +503,7 @@ class ExperimentalCog(commands.Cog):
             rank = (
                 RANK_MEDALS[index - 1]
                 if index <= len(RANK_MEDALS)
-                else f"{index}."
+                else f"**`{index}.`**"
             )
             applications = tracking_text(
                 "snipers_applications_one"
@@ -517,8 +517,8 @@ class ExperimentalCog(commands.Cog):
                 language,
                 count=row.viewed,
             )
-            lines.append(f"{rank} <@{row.user_id}>\n{applications} · {views}")
-        return "\n".join(lines)
+            lines.append(f"{rank} <@{row.user_id}>\n-# → {applications} · {views}")
+        return "\n\n".join(lines)
 
     @app_commands.command(
         name="experimental",
@@ -542,7 +542,6 @@ class ExperimentalCog(commands.Cog):
     )
     @app_commands.guilds()
     @app_commands.guild_only()
-    @app_commands.default_permissions(manage_guild=True)
     async def snipers(self, interaction: discord.Interaction) -> None:
         guild_id = interaction.guild_id or 0
         language = await self._language(guild_id)
