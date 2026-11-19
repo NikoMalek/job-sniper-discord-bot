@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import secrets
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +33,80 @@ class GuildMonitorConfig:
         return self.locations[0] if self.locations else DEFAULT_LOCATION
 
 
+@dataclass(frozen=True, slots=True)
+class TrackedJob:
+    """Metadata needed when a tracked notification button is pressed."""
+
+    token: str
+    guild_id: int
+    job_id: str
+    source: str
+    job_url: str
+    job_title: str
+    company: str
+
+
+@dataclass(frozen=True, slots=True)
+class JobInteraction:
+    """A click on a job offer plus its optional application answer."""
+
+    id: int
+    guild_id: int
+    user_id: int
+    job_url: str
+    job_title: str
+    company: str
+    source: str
+    clicked_at: str
+    applied: bool | None
+    notes: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationRecord:
+    """Recent application row shown by `/applications`."""
+
+    job_title: str
+    company: str
+    job_url: str
+    source: str
+    clicked_at: str
+    applied: bool | None
+    notes: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationSummary:
+    """Overall counters shown at the top of `/applications`."""
+
+    clicked: int
+    applied: int
+    skipped: int
+    viewed: int
+
+
+@dataclass(frozen=True, slots=True)
+class DebugReport:
+    """A guild report with an optional note left in the tracking modal."""
+
+    user_id: int
+    job_title: str
+    job_url: str
+    source: str
+    clicked_at: str
+    applied: bool | None
+    notes: str
+
+
+@dataclass(frozen=True, slots=True)
+class SniperRanking:
+    """Per-user totals used by `/snipers`."""
+
+    user_id: int
+    applications: int
+    viewed: int
+
+
 class Database:
     """Small repository around the SQLite schema."""
 
@@ -49,7 +125,8 @@ class Database:
                     channel_id INTEGER,
                     location TEXT NOT NULL DEFAULT '',
                     max_age_hours REAL NOT NULL DEFAULT 24.0,
-                    setup_message_sent INTEGER NOT NULL DEFAULT 0
+                    setup_message_sent INTEGER NOT NULL DEFAULT 0,
+                    experimental_enabled INTEGER NOT NULL DEFAULT 0
                 );
 
                 CREATE TABLE IF NOT EXISTS guild_keywords (
@@ -109,6 +186,42 @@ class Database:
 
                 CREATE INDEX IF NOT EXISTS idx_notified_jobs_created_at
                     ON notified_jobs(created_at);
+
+                CREATE TABLE IF NOT EXISTS tracked_jobs (
+                    token TEXT PRIMARY KEY,
+                    guild_id INTEGER NOT NULL,
+                    job_id TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    job_url TEXT NOT NULL,
+                    job_title TEXT NOT NULL,
+                    company TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS job_interactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    job_url TEXT NOT NULL,
+                    job_title TEXT NOT NULL,
+                    company TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    clicked_at TEXT NOT NULL,
+                    applied INTEGER CHECK (applied IS NULL OR applied IN (0, 1)),
+                    notes TEXT,
+                    UNIQUE (guild_id, user_id, job_url),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_job_interactions_guild_clicked
+                    ON job_interactions(guild_id, clicked_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_job_interactions_user_clicked
+                    ON job_interactions(guild_id, user_id, clicked_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_tracked_jobs_created_at
+                    ON tracked_jobs(created_at);
                 """
             )
             columns_cursor = await connection.execute("PRAGMA table_info(guild_configs)")
@@ -121,6 +234,26 @@ class Database:
                 await connection.execute(
                     "ALTER TABLE guild_configs ADD COLUMN setup_message_sent INTEGER NOT NULL DEFAULT 0"
                 )
+            if "experimental_enabled" not in columns:
+                await connection.execute(
+                    "ALTER TABLE guild_configs ADD COLUMN experimental_enabled INTEGER NOT NULL DEFAULT 0"
+                )
+            interaction_columns_cursor = await connection.execute(
+                "PRAGMA table_info(job_interactions)"
+            )
+            interaction_columns = {
+                row[1] for row in await interaction_columns_cursor.fetchall()
+            }
+            if "notes" not in interaction_columns:
+                if "observation" in interaction_columns:
+                    # Earlier local builds called the same field "observation".
+                    await connection.execute(
+                        "ALTER TABLE job_interactions RENAME COLUMN observation TO notes"
+                    )
+                else:
+                    await connection.execute(
+                        "ALTER TABLE job_interactions ADD COLUMN notes TEXT"
+                    )
             await connection.execute(
                 "UPDATE guild_configs SET max_age_hours = ? WHERE max_age_hours > ?",
                 (MAX_MAX_AGE_HOURS, MAX_MAX_AGE_HOURS),
@@ -234,6 +367,36 @@ class Database:
                 (guild_id,),
             )
             await connection.commit()
+
+    async def is_experimental_enabled(self, guild_id: int) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT experimental_enabled FROM guild_configs WHERE guild_id = ?",
+                (guild_id,),
+            )
+            row = await cursor.fetchone()
+        return bool(row and row[0])
+
+    async def set_experimental_enabled(self, guild_id: int, enabled: bool) -> None:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            await connection.execute(
+                "UPDATE guild_configs SET experimental_enabled = ? WHERE guild_id = ?",
+                (int(enabled), guild_id),
+            )
+            await connection.commit()
+
+    async def get_experimental_enabled_guild_ids(self) -> list[int]:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT guild_id FROM guild_configs
+                WHERE experimental_enabled = 1
+                ORDER BY guild_id
+                """
+            )
+            return [int(row[0]) for row in await cursor.fetchall()]
 
     async def set_channel(self, guild_id: int, channel_id: int) -> None:
         await self._ensure_guild(guild_id)
@@ -628,3 +791,331 @@ class Database:
             )
             row: Any = await cursor.fetchone()
         return int(row[0])
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+    async def store_tracked_job(
+        self,
+        guild_id: int,
+        job_id: str,
+        source: str,
+        job_url: str,
+        job_title: str,
+        company: str,
+    ) -> str:
+        """Store the metadata behind a short-lived tracking button token."""
+        token = secrets.token_hex(8)
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            await connection.execute(
+                """
+                INSERT INTO tracked_jobs
+                    (token, guild_id, job_id, source, job_url, job_title,
+                     company, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    token,
+                    guild_id,
+                    job_id,
+                    source,
+                    job_url,
+                    job_title,
+                    company,
+                    self._utc_now(),
+                ),
+            )
+            await connection.commit()
+        return token
+
+    async def get_tracked_job(self, token: str) -> TrackedJob | None:
+        async with aiosqlite.connect(self.path) as connection:
+            connection.row_factory = aiosqlite.Row
+            cursor = await connection.execute(
+                "SELECT * FROM tracked_jobs WHERE token = ?", (token,)
+            )
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return TrackedJob(
+            token=row["token"],
+            guild_id=int(row["guild_id"]),
+            job_id=row["job_id"],
+            source=row["source"],
+            job_url=row["job_url"],
+            job_title=row["job_title"],
+            company=row["company"],
+        )
+
+    async def record_job_click(
+        self,
+        guild_id: int,
+        user_id: int,
+        job_url: str,
+        job_title: str,
+        company: str,
+        source: str,
+    ) -> int:
+        """Register a click and return the interaction row id.
+
+        Repeated clicks on the same offer refresh ``clicked_at`` but keep the
+        answer already given by the user.
+        """
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            await connection.execute(
+                """
+                INSERT INTO job_interactions
+                    (guild_id, user_id, job_url, job_title, company, source,
+                     clicked_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (guild_id, user_id, job_url) DO UPDATE SET
+                    clicked_at = excluded.clicked_at,
+                    job_title = excluded.job_title,
+                    company = excluded.company,
+                    source = excluded.source
+                """,
+                (
+                    guild_id,
+                    user_id,
+                    job_url,
+                    job_title,
+                    company,
+                    source,
+                    self._utc_now(),
+                ),
+            )
+            cursor = await connection.execute(
+                """
+                SELECT id FROM job_interactions
+                WHERE guild_id = ? AND user_id = ? AND job_url = ?
+                """,
+                (guild_id, user_id, job_url),
+            )
+            row = await cursor.fetchone()
+            await connection.commit()
+        if row is None:  # pragma: no cover - the upsert always creates the row
+            raise RuntimeError("Job interaction was not created")
+        return int(row[0])
+
+    @staticmethod
+    def _interaction_from_row(row: aiosqlite.Row) -> JobInteraction:
+        applied = row["applied"]
+        return JobInteraction(
+            id=int(row["id"]),
+            guild_id=int(row["guild_id"]),
+            user_id=int(row["user_id"]),
+            job_url=row["job_url"],
+            job_title=row["job_title"],
+            company=row["company"],
+            source=row["source"],
+            clicked_at=row["clicked_at"],
+            applied=None if applied is None else bool(applied),
+            notes=row["notes"] or None,
+        )
+
+    async def get_job_interaction(self, record_id: int) -> JobInteraction | None:
+        async with aiosqlite.connect(self.path) as connection:
+            connection.row_factory = aiosqlite.Row
+            cursor = await connection.execute(
+                "SELECT * FROM job_interactions WHERE id = ?", (record_id,)
+            )
+            row = await cursor.fetchone()
+        return None if row is None else self._interaction_from_row(row)
+
+    async def update_application_status(
+        self,
+        record_id: int,
+        applied: bool | None,
+        notes: str | None = None,
+    ) -> bool:
+        """Save the Yes/No answer and the optional user notes."""
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "UPDATE job_interactions SET applied = ?, notes = ? WHERE id = ?",
+                (None if applied is None else int(applied), notes, record_id),
+            )
+            await connection.commit()
+            return cursor.rowcount == 1
+
+    async def get_guild_snipers_ranking(
+        self, guild_id: int, limit: int = 10
+    ) -> list[SniperRanking]:
+        async with aiosqlite.connect(self.path) as connection:
+            connection.row_factory = aiosqlite.Row
+            cursor = await connection.execute(
+                """
+                SELECT user_id,
+                       SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END) AS applications,
+                       COUNT(*) AS viewed
+                FROM job_interactions
+                WHERE guild_id = ?
+                GROUP BY user_id
+                ORDER BY SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END) DESC,
+                         COUNT(*) DESC,
+                         user_id
+                LIMIT ?
+                """,
+                (guild_id, max(1, int(limit))),
+            )
+            rows = await cursor.fetchall()
+        return [
+            SniperRanking(
+                user_id=int(row["user_id"]),
+                applications=int(row["applications"]),
+                viewed=int(row["viewed"]),
+            )
+            for row in rows
+        ]
+
+    async def get_guild_snipers_totals(self, guild_id: int) -> tuple[int, int]:
+        """Return global (confirmed applications, interactions viewed) totals."""
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT COALESCE(SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END), 0),
+                       COUNT(*)
+                FROM job_interactions
+                WHERE guild_id = ?
+                """,
+                (guild_id,),
+            )
+            row = await cursor.fetchone()
+        if row is None:
+            return 0, 0
+        return int(row[0]), int(row[1])
+
+    async def get_user_application_summary(
+        self, guild_id: int, user_id: int
+    ) -> ApplicationSummary:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                """
+                SELECT COUNT(*) AS clicked,
+                       COALESCE(SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN applied = 0 THEN 1 ELSE 0 END), 0),
+                       COALESCE(SUM(CASE WHEN applied IS NULL THEN 1 ELSE 0 END), 0)
+                FROM job_interactions
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            )
+            row = await cursor.fetchone()
+        assert row is not None
+        return ApplicationSummary(
+            clicked=int(row[0]),
+            applied=int(row[1]),
+            skipped=int(row[2]),
+            viewed=int(row[3]),
+        )
+
+    async def get_user_applications(
+        self, guild_id: int, user_id: int, limit: int = 15, offset: int = 0
+    ) -> list[ApplicationRecord]:
+        async with aiosqlite.connect(self.path) as connection:
+            connection.row_factory = aiosqlite.Row
+            cursor = await connection.execute(
+                """
+                SELECT job_title, company, job_url, source, clicked_at, applied,
+                       notes
+                FROM job_interactions
+                WHERE guild_id = ? AND user_id = ?
+                ORDER BY clicked_at DESC, id DESC
+                LIMIT ? OFFSET ?
+                """,
+                (guild_id, user_id, max(1, int(limit)), max(0, int(offset))),
+            )
+            rows = await cursor.fetchall()
+        return [
+            ApplicationRecord(
+                job_title=row["job_title"],
+                company=row["company"],
+                job_url=row["job_url"],
+                source=row["source"] or "",
+                clicked_at=row["clicked_at"],
+                applied=(
+                    None
+                    if row["applied"] is None
+                    else bool(row["applied"])
+                ),
+                notes=row["notes"] or None,
+            )
+            for row in rows
+        ]
+
+    async def get_debug_report_count(
+        self, guild_id: int, source: str | None = None
+    ) -> int:
+        """Count recent reports with a non-empty note, optionally by portal."""
+        query = """
+            SELECT COUNT(*) FROM job_interactions
+            WHERE guild_id = ?
+              AND notes IS NOT NULL
+              AND TRIM(notes) != ''
+        """
+        params: list[object] = [guild_id]
+        if source:
+            query += " AND LOWER(source) = LOWER(?)"
+            params.append(source.strip())
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(query, params)
+            row = await cursor.fetchone()
+        return int(row[0]) if row else 0
+
+    async def get_debug_reports(
+        self,
+        guild_id: int,
+        source: str | None = None,
+        limit: int = 5,
+        offset: int = 0,
+    ) -> list[DebugReport]:
+        """Return the newest notes left in the tracking modal."""
+        query = """
+            SELECT user_id, job_title, job_url, source, clicked_at, applied, notes
+            FROM job_interactions
+            WHERE guild_id = ?
+              AND notes IS NOT NULL
+              AND TRIM(notes) != ''
+        """
+        params: list[object] = [guild_id]
+        if source:
+            query += " AND LOWER(source) = LOWER(?)"
+            params.append(source.strip())
+        query += " ORDER BY clicked_at DESC, id DESC LIMIT ? OFFSET ?"
+        params.extend((max(1, int(limit)), max(0, int(offset))))
+        async with aiosqlite.connect(self.path) as connection:
+            connection.row_factory = aiosqlite.Row
+            cursor = await connection.execute(query, params)
+            rows = await cursor.fetchall()
+        return [
+            DebugReport(
+                user_id=int(row["user_id"]),
+                job_title=row["job_title"],
+                job_url=row["job_url"],
+                source=row["source"] or "",
+                clicked_at=row["clicked_at"],
+                applied=(
+                    None
+                    if row["applied"] is None
+                    else bool(row["applied"])
+                ),
+                notes=row["notes"].strip(),
+            )
+            for row in rows
+        ]
+
+    async def cleanup_tracked_jobs(
+        self, hours: float = NOTIFIED_RETENTION_HOURS
+    ) -> int:
+        """Drop tracking tokens older than the notification retention window."""
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=float(hours))
+        ).isoformat(timespec="seconds")
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "DELETE FROM tracked_jobs WHERE created_at < ?", (cutoff,)
+            )
+            await connection.commit()
+            return cursor.rowcount

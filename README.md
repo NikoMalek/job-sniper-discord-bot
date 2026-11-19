@@ -43,7 +43,8 @@ El comportamiento actual es:
   conectarse directamente.
 - **LinkedIn**: intenta conectarse directamente y usa el Worker como fallback
   si recibe un bloqueo o un error temporal, como `429`.
-- **Get on Board**: se consulta directo, sin pasar por el Worker.
+- **Get on Board**: igual que LinkedIn, intenta directo y usa el Worker como
+  fallback si la API pública falla o bloquea la petición.
 - **Computrabajo**: igual que LinkedIn, intenta directo y usa el Worker como
   fallback.
 - **FirstJob**: igual que LinkedIn y Computrabajo, intenta directo y usa el
@@ -52,7 +53,8 @@ El comportamiento actual es:
 El Worker solo reenvía peticiones `GET` hacia los hosts permitidos y requiere
 un token compartido con el bot. `ALLOWED_HOSTS` acepta hosts exactos y
 comodines de subdominio como `*.computrabajo.com`, que cubre todos los países
-del portal. Para FirstJob se permiten `firstjob.me` y `www.firstjob.me`.
+del portal. Para FirstJob se permiten `firstjob.me` y `www.firstjob.me`, y para
+Get on Board `www.getonbrd.com`.
 
 ### Modos
 
@@ -68,7 +70,7 @@ del portal. Para FirstJob se permiten `firstjob.me` y `www.firstjob.me`.
 | ChileTrabajos | `always` |
 | LinkedIn | `fallback` |
 | Computrabajo | `fallback` |
-| Get on Board | `off` (conexión directa) |
+| Get on Board | `fallback` |
 | FirstJob | `fallback` |
 
 Solo se proxean los hosts permitidos por cada scraper (`PROXY_HOSTS`) y el
@@ -100,20 +102,38 @@ Así las pruebas locales nunca pasan por el Worker.
 
 ## Flujo de contribución
 
-Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
+Se utilizan dos ramas principales:
+
+- `main`: representa producción. Esta protegida y no se debe trabajar
+  directamente sobre ella.
+- `develop`: rama de integración y pruebas antes de publicar en producción.
+
+Las ramas temporales se crean así:
+
+- `feature/nombre-del-cambio`: nuevas funcionalidades, desde `develop`.
+- `fix/nombre-del-cambio`: correcciones normales, desde `develop`.
+- `hotfix/nombre-del-cambio`: correcciones urgentes de producción, desde
+  `main`.
+
+### Features y fixes normales
+
+Para cada cambio que no sea urgente:
 
 1. Actualiza tu copia local:
 
    ```powershell
-   git checkout main
-   git pull origin main
+   git checkout develop
+   git pull origin develop
    ```
 
-2. Crea una rama descriptiva:
+2. Crea una rama descriptiva desde `develop`:
 
    ```powershell
    git checkout -b feature/nombre-del-cambio
    ```
+
+   Para una corrección normal, usa `fix/nombre-del-cambio` en lugar de
+   `feature/nombre-del-cambio`.
 
 3. Implementa y valida el cambio.
 4. Guarda los cambios y publica la rama:
@@ -124,17 +144,38 @@ Los cambios no deben hacerse directamente sobre `main`. Para cada cambio:
    git push -u origin feature/nombre-del-cambio
    ```
 
-5. Abre un Pull Request hacia `main`, espera la revisión y fusiónalo solo
-   después de que pasen las validaciones.
+   Si usaste una rama `fix`, reemplaza el nombre en el comando.
+
+5. Abre un Pull Request hacia `develop`. Después de la revisión y de que
+   pasen las validaciones, fusiona el cambio en `develop`.
+6. Cuando `develop` esté validada, abre un Pull Request de `develop` hacia
+   `main` para publicar en producción.
+
+### Correcciones urgentes en producción
+
+Si el problema está en producción y no puede esperar al ciclo normal:
+
+1. Actualiza `main` y crea una rama `hotfix` desde ella:
+
+   ```powershell
+   git checkout main
+   git pull origin main
+   git checkout -b hotfix/nombre-del-cambio
+   ```
+
+2. Implementa, valida y abre un Pull Request hacia `main`.
+3. Después de fusionar el hotfix en `main`, incorpora también esos cambios en
+   `develop` para evitar que la corrección se pierda en la siguiente
+   publicación.
 
 ## Uso
 
-Al unirse a un servidor, y una sola vez en los servidores donde ya estaba, el
-bot envía una guía con los comandos principales. Se marca como enviada para no
-repetirla.
+Al unirse a un servidor, el
+bot envía una guía con los comandos principales.
 
-Los comandos de configuración requieren `Manage Server`. Para dar acceso a un
+Todos los comandos requieren `Manage Server` por defecto. Para dar acceso a un
 rol o usuario concreto, usa Ajustes del servidor → Integraciones → Job Sniper.
+La guía de bienvenida también lo indica.
 
 Comandos:
 
@@ -161,10 +202,11 @@ Comandos:
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
 - `/add-portal` y `/remove-portal`: activa o desactiva portales de empleo
-  desde una lista (`linkedin`, `chiletrabajos`, `computrabajo`, `getonbrd`,
-  `firstjob`). Cada servidor debe conservar al menos uno activo. `/add-portal`
-  rechaza un portal incompatible con las ubicaciones actuales y explica cómo
-  corregirlo.
+  (`linkedin`, `chiletrabajos`, `computrabajo`, `getonbrd`, `firstjob`).
+  Cada servidor debe conservar al menos uno activo. `/add-portal` ofrece todos
+  los portales disponibles y rechaza uno incompatible con las ubicaciones
+  actuales, explicando cómo corregirlo. `/remove-portal` solo ofrece los
+  portales configurados en el servidor, tanto activos (✅) como pausados (⏸️).
 - `/list-portals`: muestra cada portal como `activo (✅)` o `pausado(⏸️)`, con la
   búsqueda resultante y su cobertura.
 - `/list-locations`: muestra las ubicaciones actuales, cómo se traducen en
@@ -173,6 +215,45 @@ Comandos:
   los portales y su estado.
 - `/status`: muestra latencia, portales (con su estado) y número de avisos
   enviados.
+
+### Zona Experimental
+
+`/experimental` activa o desactiva el tracking por
+servidor. Cuando está activa, se habilitan botones en los avisos que abren un **modal privado**
+que contiene el enlace real, un selector `✅ Sí, postulé` / `❌ No, no aplica` y
+un campo opcional de **Observación / debug** (este se guarda con el registro, pero
+solo se muestra en `/debug`, ejemplos de uso: “el enlace no abrió”, “la oferta estaba en inglés” o
+“busco solo ofertas en español”).
+Al presionar **Ver oferta** la oferta queda registrada como `sin responder`;
+al enviar el modal, esa misma fila pasa a `Postulado` u `Omitido` al responder. Si se cierra con la X/Escape, Discord no avisa
+al bot y la oferta se mantiene como `sin responder`.
+
+En el modo experimental aparecen tres
+comandos adicionales, que se sincronizan solo en el servidor que activó la
+función y desaparecen al desactivarla:
+
+- `/snipers`: un único ranking del servidor con un resumen global y medallas
+  (`🥇`, `🥈`, `🥉`) para el top 3; el resto se numera. Cada usuario muestra sus
+  postulaciones y vistas, ordenado por postulaciones y, en empate, por vistas.
+- `/applications`: muestra **solo tus** ofertas en una única lista ordenada de
+  la más reciente a la más antigua, con los totales arriba y botones
+  `◀ Anterior` / `Siguiente ▶` si hay más de una página. Cada línea incluye
+  fecha y hora, título enlazado, empresa, portal y estado. La fecha y hora usan
+  timestamps dinámicos de Discord (`<t:...:d> · <t:...:t>`), así que cada
+  persona las ve en su propia hora local sin que el bot tenga que saber su zona.
+- `/applications @user`: muestra **solo las ofertas de ese usuario**, con el
+  mismo orden, totales, portal, hora y paginación.
+- `/debug [source]`: lista las observaciones más recientes con fecha, usuario,
+  portal, cargo enlazado, estado (*Postulado*, *Omitido* o *Sin responder*) y el texto dejado. El
+  parámetro opcional `source` sugiere portales activos en el servidor (por
+  ejemplo, `LinkedIn`).
+
+Con la Zona Experimental activada, el título de la tarjeta no es un enlace y la
+descripción termina solo en `…`: la URL de la oferta está dentro del botón
+**Ver oferta** (y de la sección “Disponible en” cuando hay varios portales).
+Al desactivar el modo se restaura el formato original: título y `Ver más...`
+enlazados a la oferta y sin botón. La interfaz de la zona experimental usa el
+primer idioma configurado que el bot soporte, con `español` como respaldo.
 
 ## Ubicaciones
 
@@ -290,7 +371,8 @@ filtra localmente por antigüedad y ubicación. Cubre cualquier país, aunque su
 catálogo se concentra en Latinoamérica y ofertas remotas. Para `Remoto` se
 incluyen las remotas globales y las limitadas a un país; para `País` se incluyen
 las presenciales de ese país y las remotas disponibles para él. Ignora los
-avisos sin fecha y se consulta directo, sin pasar por el Worker del proxy.
+avisos sin fecha. Consulta la API directamente y, si falla o bloquea la petición,
+reintenta por el Worker del proxy (`fallback`).
 
 ChileTrabajos **solo publica ofertas de Chile**. Si el servidor configura una
 ubicación de otro país, el portal busca en todo Chile y `/add-portal` y
