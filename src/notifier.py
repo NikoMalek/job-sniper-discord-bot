@@ -11,6 +11,8 @@ from urllib.parse import urlsplit
 import discord
 import httpx
 
+from .database import Database
+from .languages import preferred_ui_language, tracking_text
 from .scrapers.base import Job
 
 LOGGER = logging.getLogger(__name__)
@@ -110,11 +112,14 @@ def _display(value: str, fallback: str = "No especificada", limit: int = 1024) -
         return fallback
     return clean_value[:limit]
 
-def _short_description(job: Job) -> str:
+def _short_description(job: Job, *, experimental: bool = True) -> str:
     description = _display(job.description, "", 280)
     if not description:
         return ""
-    suffix = f"… [Ver más...]({job.url})"
+    # In the experimental zone the link lives only in the tracking button, so
+    # the card just ends with dots. Outside it the original linked "Ver más"
+    # suffix is restored.
+    suffix = "…" if experimental else f"… [Ver más...]({job.url})"
     available = 4000 - len(suffix)
     if len(description) > available:
         description = f"{description[:available].rstrip(' .,;:')}..."
@@ -140,8 +145,14 @@ def build_job_embed(job: Job) -> discord.Embed:
     return build_jobs_embed([job])
 
 
-def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
-    """Build one embed for one job or a group of the same job across portals."""
+def build_jobs_embed(
+    jobs: Sequence[Job], *, experimental: bool = True
+) -> discord.Embed:
+    """Build one embed for one job or a group of the same job across portals.
+
+    Experimental guilds get a clean card whose only link is the tracking
+    button. Other guilds keep the original card: linked title and "Ver más".
+    """
     if not jobs:
         raise ValueError("At least one job is required to build an embed.")
     primary = jobs[0]
@@ -150,7 +161,7 @@ def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
     source_key = source.casefold()
     embed = discord.Embed(
         title=_display(primary.title, "Vacante sin título", 256),
-        url=primary.url,
+        url=None if experimental else primary.url,
         colour=SOURCE_COLORS.get(source_key, discord.Colour.blurple()),
     )
     if len(sources) == 1:
@@ -163,7 +174,7 @@ def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
     else:
         embed.set_author(name=f"Nueva vacante · {len(sources)} portales")
 
-    short_description = _short_description(primary)
+    short_description = _short_description(primary, experimental=experimental)
     description_parts = [
         f"**Empresa**\n{_display(primary.company)}",
         f"**Ubicación**\n{_display(primary.location)}",
@@ -195,11 +206,88 @@ def build_jobs_embed(jobs: Sequence[Job]) -> discord.Embed:
     return embed
 
 
-async def send_jobs(channel: discord.abc.Messageable, jobs: Sequence[Job]) -> bool:
+async def build_job_view(
+    job: Job,
+    *,
+    guild_id: int | None = None,
+    language: str | None = None,
+    database: Database | None = None,
+    experimental: bool | None = None,
+) -> discord.ui.View | None:
+    """Build the experimental tracking button, or ``None`` outside the zone.
+
+    Outside the experimental zone notifications keep the original card (linked
+    title and "Ver más"), so there is no button at all. Experimental guilds get
+    a button whose short token is stored in the database; it has no local
+    callback because the experimental cog handles its ``custom_id`` from
+    ``on_interaction`` so it survives bot restarts.
+    """
+    if experimental is None:
+        experimental = (
+            database is not None
+            and guild_id is not None
+            and await database.is_experimental_enabled(guild_id)
+        )
+    if not experimental:
+        return None
+
+    if language is None:
+        if database is not None and guild_id is not None:
+            config = await database.get_guild_config(guild_id)
+            language = preferred_ui_language(config.languages)
+        else:
+            language = "spanish"
+
+    view = discord.ui.View(timeout=None)
+    label = tracking_text("view_job", language)
+    if database is not None and guild_id is not None:
+        token = await database.store_tracked_job(
+            guild_id,
+            job.id,
+            job.source,
+            job.url,
+            job.title,
+            job.company,
+        )
+        button = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.primary,
+            custom_id=f"job_track:{token}",
+        )
+    else:
+        button = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.link,
+            url=job.url,
+        )
+    view.add_item(button)
+    return view
+
+
+async def send_jobs(
+    channel: discord.abc.Messageable,
+    jobs: Sequence[Job],
+    *,
+    guild_id: int | None = None,
+    language: str | None = None,
+    database: Database | None = None,
+) -> bool:
     group = list(jobs)
     if not group:
         return False
     first = group[0]
+    experimental = (
+        database is not None
+        and guild_id is not None
+        and await database.is_experimental_enabled(guild_id)
+    )
+    view = await build_job_view(
+        first,
+        guild_id=guild_id,
+        language=language,
+        database=database,
+        experimental=experimental,
+    )
 
     logo: tuple[str, bytes] | None = None
     if _should_prefetch_logo(first.company_logo_url):
@@ -208,21 +296,21 @@ async def send_jobs(channel: discord.abc.Messageable, jobs: Sequence[Job]) -> bo
     # Try the reliable attached logo first, then fall back to a plain embed.
     attempts = ([True] if logo is not None else []) + [False]
     for with_file in attempts:
-        embed = build_jobs_embed(group)
-        filename = ""
+        embed = build_jobs_embed(group, experimental=experimental)
+        send_kwargs: dict[str, object] = {"embed": embed}
+        # Passing view=None explicitly makes discord.py call None.is_finished().
+        if view is not None:
+            send_kwargs["view"] = view
         if with_file:
             assert logo is not None
             extension, content = logo
             filename = f"company-logo.{extension}"
             embed.set_thumbnail(url=f"attachment://{filename}")
+            send_kwargs["files"] = [
+                discord.File(io.BytesIO(content), filename=filename)
+            ]
         try:
-            if with_file:
-                await channel.send(
-                    embed=embed,
-                    files=[discord.File(io.BytesIO(content), filename=filename)],
-                )
-            else:
-                await channel.send(embed=embed)
+            await channel.send(**send_kwargs)
             return True
         except discord.Forbidden as exc:
             if with_file:
@@ -243,5 +331,18 @@ async def send_jobs(channel: discord.abc.Messageable, jobs: Sequence[Job]) -> bo
     return False
 
 
-async def send_job(channel: discord.abc.Messageable, job: Job) -> bool:
-    return await send_jobs(channel, [job])
+async def send_job(
+    channel: discord.abc.Messageable,
+    job: Job,
+    *,
+    guild_id: int | None = None,
+    language: str | None = None,
+    database: Database | None = None,
+) -> bool:
+    return await send_jobs(
+        channel,
+        [job],
+        guild_id=guild_id,
+        language=language,
+        database=database,
+    )

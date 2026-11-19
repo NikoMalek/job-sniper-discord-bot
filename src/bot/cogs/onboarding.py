@@ -59,6 +59,15 @@ def build_setup_embed() -> discord.Embed:
         ),
         inline=False,
     )
+    embed.add_field(
+        name="🔐 Permisos de comandos",
+        value=(
+            "Por defecto los comandos se requieren configurar. Puedes "
+            "elegir quién puede usar cada uno en "
+            "**Ajustes del servidor → Integraciones → Job Sniper**."
+        ),
+        inline=False,
+    )
     return embed
 
 
