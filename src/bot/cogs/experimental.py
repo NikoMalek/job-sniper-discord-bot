@@ -652,7 +652,12 @@ class ExperimentalCog(commands.Cog):
                 await self._handle_toggle(
                     interaction, custom_id[len(EXPERIMENTAL_TOGGLE_PREFIX) :]
                 )
-        except (ValueError, discord.HTTPException):
+        except (ValueError, discord.HTTPException) as error:
+            if isinstance(error, discord.NotFound) or interaction.is_expired():
+                # Responding again with an expired token only raises another
+                # 404 (10062) and escapes this listener.
+                LOGGER.debug("Interaction expired before handling %s", custom_id)
+                return
             LOGGER.exception("Could not handle tracking interaction %s", custom_id)
             if not interaction.response.is_done():
                 language = await self._language(interaction.guild_id)
@@ -698,6 +703,9 @@ class ExperimentalCog(commands.Cog):
     async def _handle_toggle(
         self, interaction: discord.Interaction, raw_guild_id: str
     ) -> None:
+        # Acknowledge immediately: the sync below can exceed Discord's 3s
+        # window, and every later update must use the followup/webhook path.
+        await interaction.response.defer()
         guild_id = int(raw_guild_id)
         if interaction.guild_id != guild_id:
             return
@@ -706,7 +714,7 @@ class ExperimentalCog(commands.Cog):
             not isinstance(interaction.user, discord.Member)
             or not interaction.user.guild_permissions.manage_guild
         ):
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 tracking_text("no_permission", language), ephemeral=True
             )
             return
@@ -723,7 +731,7 @@ class ExperimentalCog(commands.Cog):
         embed = self._status_embed(guild_id, enabled, language)
         if not sync_ok:
             embed.set_footer(text=tracking_text("sync_fallback", language))
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=embed,
             view=self._toggle_view(guild_id, enabled, language),
         )
