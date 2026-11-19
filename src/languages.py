@@ -189,7 +189,8 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
             "confirmación Sí/No y un campo opcional de observación/debug. "
             "Al abrirlo se cuenta como visto; al enviarlo se marca Postulado "
             "u Omitido.\n"
-            "`/experimental` activa o desactiva el modo.\n"
+            "`/experimental` muestra la información y el estado; usa "
+            "`/experimental accion:activar` o `accion:desactivar` para cambiarlo.\n"
             "`/snipers` muestra el ranking, `/applications` (o "
             "`/applications @user`) el historial paginado con totales.\n"
             "`/debug` permite revisar las observaciones y comentarios dejados en "
@@ -201,7 +202,8 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
             "Offer buttons open a private modal with the link, a Yes/No "
             "confirmation and an optional notes/debug field. Opening it counts "
             "as viewed; submitting marks it as Applied or Skipped.\n"
-            "`/experimental` enables or disables the mode.\n"
+            "`/experimental` shows the information and status; use "
+            "`/experimental accion:activar` or `accion:desactivar` to change it.\n"
             "`/snipers` shows the ranking, `/applications` (or "
             "`/applications @user`) the paginated history with totals.\n"
             "`/debug` reviews the notes left on offers. The permissions for "
@@ -213,7 +215,8 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
             "Os botões de vagas abrem um modal privado com o link, a confirmação "
             "Sim/Não e um campo opcional de observação/debug. Ao abrir conta "
             "como visto; ao enviar marca Candidatado ou Ignorado.\n"
-            "`/experimental` ativa ou desativa o modo.\n"
+            "`/experimental` mostra as informações e o estado; use "
+            "`/experimental accion:activar` ou `accion:desactivar` para alterá-lo.\n"
             "`/snipers` mostra o ranking, `/applications` (ou "
             "`/applications @user`) o histórico paginado com totais.\n"
             "`/debug` permite revisar as observações deixadas nas vagas. As "
@@ -225,7 +228,8 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
             "Les boutons d'offres ouvrent un formulaire privé avec le lien, la "
             "confirmation Oui/Non et un champ facultatif de remarques/debug. "
             "L'ouverture compte comme vue ; l'envoi marque Candidaté ou Ignoré.\n"
-            "`/experimental` active ou désactive le mode.\n"
+            "`/experimental` affiche les informations et l'état ; utilisez "
+            "`/experimental accion:activar` ou `accion:desactivar` pour le modifier.\n"
             "`/snipers` affiche le classement, `/applications` (ou "
             "`/applications @user`) l'historique paginé avec les totaux.\n"
             "`/debug` permet de consulter les remarques laissées sur les offres. "
@@ -238,27 +242,14 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
             "Ja/Nein-Bestätigung und einem optionalen Bemerkungen/Debug-Feld. "
             "Beim Öffnen zählt es als angesehen; beim Senden wird es als "
             "Beworben oder Übersprungen markiert.\n"
-            "`/experimental` aktiviert oder deaktiviert den Modus.\n"
+            "`/experimental` zeigt die Informationen und den Status; mit "
+            "`/experimental accion:activar` oder `accion:desactivar` kannst du ihn ändern.\n"
             "`/snipers` zeigt die Rangliste, `/applications` (oder "
             "`/applications @user`) den paginierten Verlauf mit Summen.\n"
             "`/debug` zeigt die zu Stellen hinterlegten Bemerkungen. Die Rechte "
             "dieser Befehle werden wie bei `/list-keywords` unter Integrationen "
             "konfiguriert. Diese Befehle existieren nur bei aktivem Modus."
         ),
-    },
-    "enable_button": {
-        "spanish": "Activar",
-        "english": "Enable",
-        "portuguese": "Ativar",
-        "french": "Activer",
-        "german": "Aktivieren",
-    },
-    "disable_button": {
-        "spanish": "Desactivar",
-        "english": "Disable",
-        "portuguese": "Desativar",
-        "french": "Désactiver",
-        "german": "Deaktivieren",
     },
     "snipers_title": {
         "spanish": "🎯 Ranking de Snipers",

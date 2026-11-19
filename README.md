@@ -218,8 +218,9 @@ Comandos:
 
 ### Zona Experimental
 
-`/experimental` activa o desactiva el tracking por
-servidor. Cuando está activa, se habilitan botones en los avisos que abren un **modal privado**
+`/experimental` muestra la información y el estado del tracking por
+servidor; usa `/experimental accion:activar` o `accion:desactivar` para cambiarlo.
+Cuando está activa, se habilitan botones en los avisos que abren un **modal privado**
 que contiene el enlace real, un selector `✅ Sí, postulé` / `❌ No, no aplica` y
 un campo opcional de **Observación / debug** (este se guarda con el registro, pero
 solo se muestra en `/debug`, ejemplos de uso: “el enlace no abrió”, “la oferta estaba en inglés” o
