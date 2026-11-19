@@ -260,19 +260,62 @@ _TRACKING_TEXTS: dict[str, dict[str, str]] = {
         "french": "Désactiver",
         "german": "Deaktivieren",
     },
-    "top_applicants": {
-        "spanish": "🎯 Top Applicants",
-        "english": "🎯 Top Applicants",
-        "portuguese": "🎯 Top Applicants",
-        "french": "🎯 Top Applicants",
-        "german": "🎯 Top Applicants",
+    "snipers_title": {
+        "spanish": "🎯 Ranking de Snipers",
+        "english": "🎯 Snipers Ranking",
+        "portuguese": "🎯 Ranking de Snipers",
+        "french": "🎯 Classement des Snipers",
+        "german": "🎯 Sniper-Rangliste",
     },
-    "top_scouts": {
-        "spanish": "👀 Top Scouts / Clicks",
-        "english": "👀 Top Scouts / Clicks",
-        "portuguese": "👀 Top Scouts / Clicks",
-        "french": "👀 Top Scouts / Clicks",
-        "german": "👀 Top Scouts / Clicks",
+    "snipers_summary": {
+        "spanish": (
+            "Resumen del servidor: `{total_applied}` postulaciones enviadas · "
+            "`{total_views}` ofertas revisadas"
+        ),
+        "english": (
+            "Server summary: `{total_applied}` applications sent · "
+            "`{total_views}` jobs viewed"
+        ),
+        "portuguese": (
+            "Resumo do servidor: `{total_applied}` candidaturas enviadas · "
+            "`{total_views}` vagas revisadas"
+        ),
+        "french": (
+            "Résumé du serveur : `{total_applied}` candidatures envoyées · "
+            "`{total_views}` offres consultées"
+        ),
+        "german": (
+            "Serverübersicht: `{total_applied}` Bewerbungen gesendet · "
+            "`{total_views}` Stellen angesehen"
+        ),
+    },
+    "snipers_applications_one": {
+        "spanish": "`{count}` postulación",
+        "english": "`{count}` application",
+        "portuguese": "`{count}` candidatura",
+        "french": "`{count}` candidature",
+        "german": "`{count}` Bewerbung",
+    },
+    "snipers_applications_many": {
+        "spanish": "`{count}` postulaciones",
+        "english": "`{count}` applications",
+        "portuguese": "`{count}` candidaturas",
+        "french": "`{count}` candidatures",
+        "german": "`{count}` Bewerbungen",
+    },
+    "snipers_views_one": {
+        "spanish": "`{count}` vista",
+        "english": "`{count}` view",
+        "portuguese": "`{count}` visualização",
+        "french": "`{count}` consultation",
+        "german": "`{count}` Aufruf",
+    },
+    "snipers_views_many": {
+        "spanish": "`{count}` vistas",
+        "english": "`{count}` views",
+        "portuguese": "`{count}` visualizações",
+        "french": "`{count}` consultations",
+        "german": "`{count}` Aufrufe",
     },
     "no_data": {
         "spanish": "Aún no hay registros.",

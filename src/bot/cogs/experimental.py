@@ -30,6 +30,7 @@ LOGGER = logging.getLogger(__name__)
 JOB_TRACK_PREFIX = "job_track:"
 EXPERIMENTAL_TOGGLE_PREFIX = "experimental_toggle:"
 PAGE_SIZE = 5
+RANK_MEDALS = ("🥇", "🥈", "🥉")
 
 
 def _display(value: str, fallback: str, limit: int) -> str:
@@ -494,12 +495,30 @@ class ExperimentalCog(commands.Cog):
 
     @staticmethod
     def _ranking_lines(rows, language: str) -> str:
+        """One unified list: medals for the podium, numbers afterwards."""
         if not rows:
             return tracking_text("no_data", language)
-        return "\n".join(
-            f"{index}. <@{row.user_id}> — 🎯 {row.applications} · 👀 {row.viewed}"
-            for index, row in enumerate(rows, start=1)
-        )
+        lines: list[str] = []
+        for index, row in enumerate(rows, start=1):
+            rank = (
+                RANK_MEDALS[index - 1]
+                if index <= len(RANK_MEDALS)
+                else f"{index}."
+            )
+            applications = tracking_text(
+                "snipers_applications_one"
+                if row.applications == 1
+                else "snipers_applications_many",
+                language,
+                count=row.applications,
+            )
+            views = tracking_text(
+                "snipers_views_one" if row.viewed == 1 else "snipers_views_many",
+                language,
+                count=row.viewed,
+            )
+            lines.append(f"{rank} <@{row.user_id}>\n{applications} · {views}")
+        return "\n".join(lines)
 
     @app_commands.command(
         name="experimental",
@@ -527,27 +546,20 @@ class ExperimentalCog(commands.Cog):
     async def snipers(self, interaction: discord.Interaction) -> None:
         guild_id = interaction.guild_id or 0
         language = await self._language(guild_id)
-        applicants = [
-            row
-            for row in await self.database.get_guild_snipers_ranking(
-                guild_id, limit=10
-            )
-            if row.applications > 0
-        ]
-        scouts = await self.database.get_guild_click_ranking(guild_id, limit=10)
+        rows = await self.database.get_guild_snipers_ranking(guild_id, limit=10)
+        total_applied, total_views = await self.database.get_guild_snipers_totals(
+            guild_id
+        )
+        summary = tracking_text(
+            "snipers_summary",
+            language,
+            total_applied=total_applied,
+            total_views=total_views,
+        )
         embed = discord.Embed(
-            title=tracking_text("experimental_title", language),
+            title=tracking_text("snipers_title", language),
+            description=f"{summary}\n\n{self._ranking_lines(rows, language)}",
             colour=0x9B59B6,
-        )
-        embed.add_field(
-            name=tracking_text("top_applicants", language),
-            value=self._ranking_lines(applicants, language),
-            inline=False,
-        )
-        embed.add_field(
-            name=tracking_text("top_scouts", language),
-            value=self._ranking_lines(scouts, language),
-            inline=False,
         )
         await interaction.response.send_message(embed=embed)
 

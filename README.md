@@ -232,8 +232,9 @@ En el modo experimental aparecen tres
 comandos adicionales, que se sincronizan solo en el servidor que activó la
 función y desaparecen al desactivarla:
 
-- `/snipers`: ranking del servidor con 🎯 postulaciones confirmadas y 👀 ofertas
-  abiertas.
+- `/snipers`: un único ranking del servidor con un resumen global y medallas
+  (`🥇`, `🥈`, `🥉`) para el top 3; el resto se numera. Cada usuario muestra sus
+  postulaciones y vistas, ordenado por postulaciones y, en empate, por vistas.
 - `/applications`: muestra **solo tus** ofertas en una única lista ordenada de
   la más reciente a la más antigua, con los totales arriba y botones
   `◀ Anterior` / `Siguiente ▶` si hay más de una página. Cada línea incluye

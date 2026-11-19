@@ -953,7 +953,9 @@ class Database:
                 FROM job_interactions
                 WHERE guild_id = ?
                 GROUP BY user_id
-                ORDER BY applications DESC, viewed DESC, user_id
+                ORDER BY SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END) DESC,
+                         COUNT(*) DESC,
+                         user_id
                 LIMIT ?
                 """,
                 (guild_id, max(1, int(limit))),
@@ -968,34 +970,22 @@ class Database:
             for row in rows
         ]
 
-    async def get_guild_click_ranking(
-        self, guild_id: int, limit: int = 10
-    ) -> list[SniperRanking]:
-        """Top users by offers opened, independently of confirmed applications."""
+    async def get_guild_snipers_totals(self, guild_id: int) -> tuple[int, int]:
+        """Return global (confirmed applications, interactions viewed) totals."""
         async with aiosqlite.connect(self.path) as connection:
-            connection.row_factory = aiosqlite.Row
             cursor = await connection.execute(
                 """
-                SELECT user_id,
-                       SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END) AS applications,
-                       COUNT(*) AS viewed
+                SELECT COALESCE(SUM(CASE WHEN applied = 1 THEN 1 ELSE 0 END), 0),
+                       COUNT(*)
                 FROM job_interactions
                 WHERE guild_id = ?
-                GROUP BY user_id
-                ORDER BY viewed DESC, applications DESC, user_id
-                LIMIT ?
                 """,
-                (guild_id, max(1, int(limit))),
+                (guild_id,),
             )
-            rows = await cursor.fetchall()
-        return [
-            SniperRanking(
-                user_id=int(row["user_id"]),
-                applications=int(row["applications"]),
-                viewed=int(row["viewed"]),
-            )
-            for row in rows
-        ]
+            row = await cursor.fetchone()
+        if row is None:
+            return 0, 0
+        return int(row[0]), int(row[1])
 
     async def get_user_application_summary(
         self, guild_id: int, user_id: int
