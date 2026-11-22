@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-
-const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=1570199844893622373&permissions=19456&scope=bot%20applications.commands';
+import Cmd from '../components/Cmd.astro';
 ---
 <BaseLayout
   title="Zona Experimental (Beta) — Job Sniper"
@@ -28,16 +27,16 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
     <div class="container">
       <div class="section-head">
         <h2>Activación y alcance</h2>
-        <p>Activa o desactiva estas funciones por servidor mediante el comando <button type="button" class="cmd-copy" data-copy="/experimental" data-copy-label="/experimental" data-copied-label="Copiado"><span data-copy-text-target>/experimental</span></button>.</p>
+        <p>Activa o desactiva estas funciones por servidor mediante el comando <Cmd c="/experimental" />.</p>
       </div>
       <div class="info-grid">
         <article class="panel">
-          <h3>Control con <button type="button" class="cmd-copy" data-copy="/experimental" data-copy-label="/experimental" data-copied-label="Copiado"><span data-copy-text-target>/experimental</span></button></h3>
+          <h3>Control con <Cmd c="/experimental" /></h3>
           <p>Consulta el estado actual o cámbialo cuando quieras. Las respuestas del comando son privadas.</p>
           <div class="kv-rows">
-            <div class="kv-row"><button type="button" class="cmd-copy" data-copy="/experimental" data-copy-label="/experimental" data-copied-label="Copiado"><span data-copy-text-target>/experimental</span></button><span>Muestra si la Zona Experimental está activa o desactivada.</span></div>
-            <div class="kv-row"><button type="button" class="cmd-copy" data-copy="/experimental accion:activar" data-copy-label="/experimental accion:activar" data-copied-label="Copiado"><span data-copy-text-target>/experimental accion:activar</span></button><span>Activa el seguimiento en el servidor.</span></div>
-            <div class="kv-row"><button type="button" class="cmd-copy" data-copy="/experimental accion:desactivar" data-copy-label="/experimental accion:desactivar" data-copied-label="Copiado"><span data-copy-text-target>/experimental accion:desactivar</span></button><span>Desactiva el seguimiento y vuelve a las alertas estándar.</span></div>
+            <div class="kv-row"><Cmd c="/experimental" /><span>Muestra si la Zona Experimental está activa o desactivada.</span></div>
+            <div class="kv-row"><Cmd c="/experimental accion:activar" /><span>Activa el seguimiento en el servidor.</span></div>
+            <div class="kv-row"><Cmd c="/experimental accion:desactivar" /><span>Desactiva el seguimiento y vuelve a las alertas estándar.</span></div>
           </div>
           <p class="muted small" style="margin-top:0.9rem">Al activar o desactivar el modo, el bot agrega o quita automáticamente los comandos experimentales en ese servidor.</p>
         </article>
@@ -47,9 +46,9 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
           <ul class="plain-list">
             <li>Por defecto, solo los <strong>administradores del servidor</strong> pueden usar estos comandos.</li>
             <li>Puedes dar acceso a otros roles o personas desde <strong>Ajustes del servidor → Integraciones → Job Sniper → Comandos</strong>.</li>
-            <li>Al encenderla, se habilitan los comandos <button type="button" class="cmd-copy" data-copy="/snipers" data-copy-label="/snipers" data-copied-label="Copiado"><span data-copy-text-target>/snipers</span></button>, <button type="button" class="cmd-copy" data-copy="/applications" data-copy-label="/applications" data-copied-label="Copiado"><span data-copy-text-target>/applications</span></button> y <button type="button" class="cmd-copy" data-copy="/debug" data-copy-label="/debug" data-copied-label="Copiado"><span data-copy-text-target>/debug</span></button> exclusivamente en ese servidor.</li>
+            <li>Al encenderla, se habilitan los comandos <Cmd c="/snipers" />, <Cmd c="/applications" /> y <Cmd c="/debug" /> exclusivamente en ese servidor.</li>
           </ul>
-          <div class="callout info" style="margin-top:0.9rem"><strong>Sin riesgos:</strong> puedes apagarla en cualquier momento sin perder tu configuración base ni tus filtros.</div>
+          <div class="callout info" style="margin-top:0.9rem"><strong>Sin interrupciones:</strong> puedes apagarla en cualquier momento. Las alertas nuevas siguen llegando en formato normal, tu configuración y filtros se conservan y las ofertas anteriores siguen disponibles para postular.</div>
         </article>
       </div>
     </div>
@@ -77,7 +76,7 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
                 <div class="mock-bar">#alertas-empleo — alerta normal</div>
                 <div class="embed">
                   <div class="thumb"><img src="/avatar.svg" alt="" loading="lazy" decoding="async" /></div>
-                  <div class="author"><img src="https://img.icons8.com/color/96/linkedin.png" alt="" loading="lazy" decoding="async" /><span>Nueva vacante · LinkedIn</span></div>
+                  <div class="author"><img src="/portals/linkedin.svg" alt="" loading="lazy" decoding="async" /><span>Nueva vacante · LinkedIn</span></div>
                   <div class="title"><span class="link">Backend Developer Python</span></div>
                   <div class="desc">Buscamos desarrollador backend con experiencia en Python, APIs y bases de datos… <span class="link">Ver más...</span></div>
                   <div class="d-fields">
@@ -100,7 +99,7 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
                 <div class="mock-bar">#alertas-empleo — Zona Experimental activada</div>
                 <div class="embed">
                   <div class="thumb"><img src="/avatar.svg" alt="" loading="lazy" decoding="async" /></div>
-                  <div class="author"><img src="https://img.icons8.com/color/96/linkedin.png" alt="" loading="lazy" decoding="async" /><span>Nueva vacante · LinkedIn</span></div>
+                  <div class="author"><img src="/portals/linkedin.svg" alt="" loading="lazy" decoding="async" /><span>Nueva vacante · LinkedIn</span></div>
                   <div class="title">Backend Developer Python</div>
                   <div class="desc">Buscamos desarrollador backend con experiencia en Python, APIs y bases de datos…</div>
                   <div class="d-fields">
@@ -129,13 +128,13 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
                     <div>
                       <div class="field-label">¿Postulaste?</div>
                       <div class="d-select" data-mock-select>
-                        <button type="button" class="d-select-trigger" aria-expanded="false">
+                        <button type="button" class="d-select-trigger" aria-haspopup="listbox" aria-expanded="false">
                           <span data-select-value>¿Postulaste?</span>
                           <span aria-hidden="true">▾</span>
                         </button>
-                        <div class="d-select-options" hidden>
-                          <button type="button" class="d-select-option" data-value="yes">✅ Sí, postulé</button>
-                          <button type="button" class="d-select-option" data-value="no">❌ No, no aplica</button>
+                        <div class="d-select-options" role="listbox" hidden>
+                          <button type="button" class="d-select-option" role="option" data-value="yes">✅ Sí, postulé</button>
+                          <button type="button" class="d-select-option" role="option" data-value="no">❌ No, no aplica</button>
                         </div>
                       </div>
                     </div>
@@ -180,7 +179,7 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
 
       <div class="info-grid">
         <article class="panel">
-          <div class="exp-tab-label" style="margin-bottom:0.4rem"><button type="button" class="cmd-copy" data-copy="/snipers" data-copy-label="/snipers" data-copied-label="Copiado" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1"><span data-copy-text-target>/snipers</span></button></div>
+          <div class="exp-tab-label" style="margin-bottom:0.4rem"><Cmd c="/snipers" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1" /></div>
           <h3>Ranking del servidor</h3>
           <p>Muestra un resumen general y una tabla ordenada por postulaciones confirmadas (y por ofertas revisadas en caso de empate).</p>
           <div class="mock-card" style="margin-top:0.9rem">
@@ -192,7 +191,7 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
 <div class="rank">🥇 <span class="mention">@usuario1</span>
 <span class="subtext">→ <code>4</code> postulaciones · <code>14</code> vistas</span>
 
-🥈 <span></span><span class="mention">@usuario2</span>
+🥈 <span class="mention">@usuario2</span>
 <span class="subtext">→ <code>3</code> postulaciones · <code>6</code> vistas</span>
 
 🥉 <span class="mention">@usuario3</span>
@@ -202,12 +201,12 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
         </article>
 
         <article class="panel">
-          <div class="exp-tab-label" style="margin-bottom:0.4rem"><button type="button" class="cmd-copy" data-copy="/applications" data-copy-label="/applications" data-copied-label="Copiado" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1"><span data-copy-text-target>/applications</span></button></div>
+          <div class="exp-tab-label" style="margin-bottom:0.4rem"><Cmd c="/applications" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1" /></div>
           <h3>Historial de postulaciones</h3>
           <p>Lista paginada desde la oferta más reciente a la más antigua, con resumen de totales y enlace a cada portal.</p>
           <ul class="plain-list">
-            <li><button type="button" class="cmd-copy" data-copy="/applications" data-copy-label="/applications" data-copied-label="Copiado"><span data-copy-text-target>/applications</span></button> — revisa tus propias ofertas.</li>
-            <li><button type="button" class="cmd-copy" data-copy="/applications @user" data-copy-label="/applications @user" data-copied-label="Copiado"><span data-copy-text-target>/applications @user</span></button> — revisa las de otro miembro del servidor.</li>
+            <li><Cmd c="/applications" /> — revisa tus propias ofertas.</li>
+            <li><Cmd c="/applications @user" /> — revisa las de otro miembro del servidor.</li>
             <li>Estados posibles: <strong>Postulado</strong>, <strong>Omitido</strong> o <strong>Sin responder</strong>.</li>
             <li>Navega entre páginas con los botones <strong>◀ Anterior</strong> y <strong>Siguiente ▶</strong>.</li>
           </ul>
@@ -215,7 +214,7 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
             <div class="mock-bar">Ejemplo — /applications</div>
             <div class="embed purple">
               <div class="title">Tus postulaciones</div>
-              <div class="desc">Usa <button type="button" class="cmd-copy" data-copy="/applications @usuario" data-copy-label="/applications @usuario" data-copied-label="Copiado"><span data-copy-text-target>/applications @usuario</span></button> para ver las de otro usuario.
+              <div class="desc">Usa <Cmd c="/applications @usuario" /> para ver las de otro usuario.
 
 <strong>Totales</strong>
 12 vistas · 4 postuladas · 3 omitidas · 5 sin responder
@@ -252,12 +251,12 @@ const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=15701998448936
 
       <div style="margin-top:1rem">
         <article class="panel">
-          <div class="exp-tab-label" style="margin-bottom:0.4rem"><button type="button" class="cmd-copy" data-copy="/debug" data-copy-label="/debug" data-copied-label="Copiado" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1"><span data-copy-text-target>/debug</span></button></div>
+          <div class="exp-tab-label" style="margin-bottom:0.4rem"><Cmd c="/debug" style="background:transparent;border-color:rgba(240,178,50,0.5);color:#fff4d1" /></div>
           <h3>Observaciones y reportes privados</h3>
           <p>Consulta los comentarios guardados al revisar ofertas. La respuesta es <strong>privada</strong> (solo visible para quien ejecuta el comando) y resulta ideal para detectar enlaces caídos o avisos mal filtrados.</p>
           <ul class="plain-list">
             <li>Muestra fecha, usuario, portal, título de la vacante, estado y nota.</li>
-            <li><button type="button" class="cmd-copy" data-copy="/debug source:<portal>" data-copy-label="/debug source:<portal>" data-copied-label="Copiado"><span data-copy-text-target>/debug source:&lt;portal&gt;</span></button> filtra los reportes de un portal específico.</li>
+            <li><Cmd c="/debug source:<portal>" /> filtra los reportes de un portal específico.</li>
             <li>Incluye botones para paginar cuando hay varios registros.</li>
           </ul>
           <div class="mock-card" style="margin-top:0.9rem; max-width: 900px;">
@@ -334,6 +333,13 @@ Filtro: <strong>LinkedIn</strong>
             trigger.classList.add('has-value');
             close();
           });
+        });
+        select.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !optionsWrap.hasAttribute('hidden')) {
+            e.preventDefault();
+            close();
+            trigger.focus();
+          }
         });
       });
       document.addEventListener('click', (e) => {

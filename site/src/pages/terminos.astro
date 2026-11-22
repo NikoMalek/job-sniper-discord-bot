@@ -1,0 +1,75 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { CHECK_INTERVAL_MIN, CONTRIBUTE_URL, GITHUB_URL, ISSUES_URL } from '../config';
+
+const toc = [
+  { id: 'servicio', label: 'El servicio' },
+  { id: 'uso', label: 'Uso aceptable' },
+  { id: 'avisos', label: 'Avisos de terceros' },
+  { id: 'disponibilidad', label: 'Disponibilidad y capacidad' },
+  { id: 'abierto', label: 'Código abierto y aportes' },
+  { id: 'portales', label: 'Portales y marcas' },
+  { id: 'responsabilidad', label: 'Responsabilidad' },
+  { id: 'contacto', label: 'Cambios y contacto' }
+];
+---
+<LegalLayout
+  title="Términos — Job Sniper"
+  heading="Términos de uso"
+  intro="Las reglas básicas para usar Job Sniper en tu servidor de Discord."
+  updated="2026-11-21"
+  toc={toc}
+>
+  <Fragment slot="summary">
+    <h2>En resumen</h2>
+    <ul>
+      <li>Usar el bot es gratis. Lo mantiene su autor en un servidor propio, con recursos limitados, y se ofrece «tal cual».</li>
+      <li>Si el uso crece, puede cambiar la frecuencia de revisión o aplicarse límites.</li>
+      <li>Los avisos son de terceros: verifica cada oferta en el portal original antes de postular.</li>
+      <li>El código es abierto: puedes revisarlo o aportar.</li>
+    </ul>
+  </Fragment>
+
+  <h2 id="servicio">El servicio</h2>
+  <p>Job Sniper es un bot de Discord de código abierto que monitorea avisos públicos de portales de empleo y los publica en el canal que elige cada servidor. Al invitar el bot o usar sus comandos aceptas estos términos.</p>
+
+  <h2 id="uso">Uso aceptable</h2>
+  <ul>
+    <li>Los administradores del servidor son responsables de la configuración del bot y de decidir qué roles o personas pueden usar sus comandos.</li>
+    <li>No uses el bot para enviar spam, acosar a otras personas ni con fines ilegales.</li>
+    <li>No lo uses de forma que sobrecargue o perjudique el servicio, por ejemplo ejecutando comandos de forma masiva o automatizada.</li>
+    <li>Podemos limitar o bloquear el acceso de un servidor o usuario ante abuso.</li>
+  </ul>
+
+  <h2 id="avisos">Avisos de terceros</h2>
+  <p>Las ofertas las publican terceros en portales ajenos. Job Sniper no las revisa ni verifica a las empresas: un aviso puede estar desactualizado, cerrado, duplicado o ser incorrecto. Comprueba siempre los datos en el portal original.</p>
+  <div class="callout info">
+    <strong>Cuidado con los fraudes:</strong> desconfía de cualquier oferta que te pida dinero, claves o documentos sensibles antes de una entrevista.
+  </div>
+  <p>Job Sniper no es una agencia de empleo ni garantiza entrevistas, respuestas o contrataciones.</p>
+
+  <h2 id="disponibilidad">Disponibilidad y capacidad</h2>
+  <p>Usar el bot es gratuito. Lo mantiene su autor en un servidor propio, con recursos limitados, y se ofrece «tal cual», sin garantía de disponibilidad continua ni de que los avisos estén completos o al día.</p>
+  <ul>
+    <li>El bot revisa los portales de forma periódica, actualmente cada {CHECK_INTERVAL_MIN} minutos aproximadamente. Si el uso crece, ese intervalo puede aumentar para mantener el servicio estable.</li>
+    <li>Podemos aplicar límites (por ejemplo, de servidores, ubicaciones o comandos) o restringir el acceso si el uso supera la capacidad del servidor.</li>
+    <li>Un portal puede cambiar o bloquear el acceso, y el bot puede pausar ese portal o dejar de ofrecerlo.</li>
+    <li>Podemos modificar, limitar o discontinuar funciones, incluida la Zona Experimental, que está en beta, o el servicio completo.</li>
+  </ul>
+
+  <h2 id="abierto">Código abierto y aportes</h2>
+  <p>El código del bot, de cómo obtiene y filtra los avisos, y de este sitio está en <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a> bajo la licencia indicada en el repositorio. Puedes revisarlo, proponer cambios y aportar siguiendo la <a href={CONTRIBUTE_URL} target="_blank" rel="noopener noreferrer">guía de contribución</a>.</p>
+  <ul>
+    <li>Los aportes se aceptan a criterio del mantenedor y, salvo que el repositorio indique otra cosa, quedan bajo la misma licencia del proyecto.</li>
+    <li>Estos términos y la política de privacidad cubren solo la instancia oficial del bot.</li>
+  </ul>
+
+  <h2 id="portales">Portales y marcas</h2>
+  <p>Job Sniper no tiene afiliación con Discord ni con los portales de empleo. Sus nombres y marcas pertenecen a sus dueños, y al abrir un aviso se aplican los términos del portal correspondiente.</p>
+
+  <h2 id="responsabilidad">Responsabilidad</h2>
+  <p>En la medida que permita la ley, Job Sniper y su mantenedor no responden por pérdidas derivadas de ofertas, postulaciones, errores del servicio o falta de disponibilidad. Tus decisiones de postular son tuyas.</p>
+
+  <h2 id="contacto">Cambios y contacto</h2>
+  <p>Podemos actualizar estos términos y los publicaremos en esta página; la fecha de arriba indica la última revisión. Para soporte o consultas, escribe en los <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">issues de GitHub</a>. El tratamiento de datos está explicado en <a href="/privacidad/">Privacidad</a>.</p>
+</LegalLayout>

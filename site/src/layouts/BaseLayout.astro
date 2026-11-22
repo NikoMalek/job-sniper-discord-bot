@@ -1,17 +1,23 @@
 ---
 import '../styles/global.css';
+import { INVITE_URL, GITHUB_URL, ISSUES_URL, NEW_ISSUE_URL, CONTRIBUTORS_URL } from '../config';
+
+const year = new Date().getFullYear();
 
 interface Props {
   title: string;
   description?: string;
+  image?: string;
 }
 
 const {
   title,
-  description = 'Job Sniper revisa portales de empleo y envía avisos a tu servidor de Discord con filtros por palabras clave, ubicación, idioma, portal y más.'
+  description = 'Job Sniper monitorea avisos públicos de portales de empleo y envía alertas a tu servidor de Discord con filtros por palabras clave, ubicación, idioma, portal y más.',
+  image = '/og.png'
 } = Astro.props;
 
-const inviteUrl = 'https://discord.com/oauth2/authorize?client_id=1570199844893622373&permissions=19456&scope=bot%20applications.commands';
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image, Astro.site);
 const pathname = Astro.url.pathname;
 const isActive = (href: string) => {
   if (href === '/') return pathname === '/';
@@ -26,9 +32,22 @@ const isActive = (href: string) => {
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#1e1f22" />
+    <link rel="canonical" href={canonical.href} />
+    <link rel="icon" type="image/svg+xml" href="/avatar.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Job Sniper" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:image" content={ogImage.href} />
+    <meta property="og:locale" content="es_CL" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage.href} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   </head>
   <body>
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
@@ -53,7 +72,8 @@ const isActive = (href: string) => {
             <span>Zona Experimental</span>
             <span class="nav-badge">Beta</span>
           </a>
-          <a class="nav-cta" href={inviteUrl} target="_blank" rel="noopener noreferrer">Invitar</a>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="nav-cta" href={INVITE_URL} target="_blank" rel="noopener noreferrer">Invitar</a>
         </nav>
       </div>
     </header>
@@ -62,7 +82,7 @@ const isActive = (href: string) => {
       <slot />
     </main>
 
-  <footer class="site-footer">
+    <footer class="site-footer">
       <div class="container footer-grid">
         <div class="footer-main">
           <a class="footer-brand" href="/">
@@ -75,14 +95,21 @@ const isActive = (href: string) => {
             <a href="/#portales">Portales</a>
             <a href="/#comandos">Comandos</a>
             <a href="/experimental/">Zona Experimental</a>
-            <a href="https://github.com/NikoMalek/job-sniper-discord-bot" target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="https://github.com/NikoMalek/job-sniper-discord-bot/issues/new" target="_blank" rel="noopener noreferrer">Proponer idea</a>
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">Soporte y reportes</a>
+            <a href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer">Proponer idea</a>
+            <a href="/#faq">Preguntas frecuentes</a>
+            <a href="/privacidad/">Privacidad</a>
+            <a href="/terminos/">Términos</a>
           </div>
-          <p class="footer-note">Proyecto open-source · Sin afiliación con Discord ni portales de empleo.</p>
+          <p class="footer-note">Proyecto open-source · Sin afiliación con Discord ni portales de empleo. Los avisos provienen de páginas públicas y cada alerta enlaza al aviso original.</p>
         </div>
-        <div class="footer-actions">
-          <button class="btn btn-secondary" type="button" data-copy={inviteUrl} data-copy-label="Copiar enlace de invitación" data-copied-label="Copiado">Copiar enlace de invitación</button>
-          <a class="btn btn-primary" href={inviteUrl} target="_blank" rel="noopener noreferrer">Invitar a Discord</a>
+        <div class="footer-side">
+          <div class="footer-actions">
+            <button class="btn btn-secondary" type="button" data-copy={INVITE_URL} data-copy-label="Copiar enlace de invitación" data-copied-label="Copiado">Copiar enlace de invitación</button>
+            <a class="btn btn-primary" href={INVITE_URL} target="_blank" rel="noopener noreferrer">Invitar a Discord</a>
+          </div>
+          <p class="footer-copyright">© {year} Job Sniper · Hecho por <a href="https://github.com/NikoMalek" target="_blank" rel="noopener noreferrer">NikoMalek</a> y <a href={CONTRIBUTORS_URL} target="_blank" rel="noopener noreferrer">colaboradores</a></p>
         </div>
       </div>
     </footer>
