@@ -1,0 +1,99 @@
+---
+import LegalLayout from '../layouts/LegalLayout.astro';
+import { GITHUB_URL, ISSUES_URL } from '../config';
+
+const toc = [
+  { id: 'datos', label: 'Qué datos guardamos' },
+  { id: 'experimental', label: 'Zona Experimental' },
+  { id: 'no-hacemos', label: 'Qué no hacemos' },
+  { id: 'uso', label: 'Cómo y dónde usamos los datos' },
+  { id: 'avisos', label: 'Avisos de los portales' },
+  { id: 'abierto', label: 'Código abierto' },
+  { id: 'eliminacion', label: 'Eliminación de datos' },
+  { id: 'contacto', label: 'Cambios y contacto' }
+];
+---
+<LegalLayout
+  title="Privacidad — Job Sniper"
+  heading="Privacidad"
+  intro="Qué información usa Job Sniper, para qué la usa y cómo puedes pedir que se elimine."
+  updated="2026-11-21"
+  toc={toc}
+>
+  <Fragment slot="summary">
+    <h2>En resumen</h2>
+    <ul>
+      <li>Guardamos la configuración de tu servidor y, si la activas, el historial de la Zona Experimental.</li>
+      <li>No leemos los mensajes de tu servidor.</li>
+      <li>Los datos se guardan en el servidor del proyecto, que administra su mantenedor. No los vendemos ni los compartimos con terceros.</li>
+      <li>Puedes pedir que eliminemos tus datos abriendo un issue en GitHub.</li>
+    </ul>
+  </Fragment>
+
+  <h2 id="datos">Qué datos guardamos</h2>
+  <p>Para funcionar, el bot guarda esta información de cada servidor donde lo instalas:</p>
+  <dl class="legal-table">
+    <div>
+      <dt>Servidor y canal</dt>
+      <dd>El ID del servidor y el del canal de avisos, para publicar las alertas donde corresponde.</dd>
+    </div>
+    <div>
+      <dt>Filtros</dt>
+      <dd>Palabras clave, ubicaciones, idiomas, antigüedad máxima, empresas excluidas y portales activos, para decidir qué ofertas enviar.</dd>
+    </div>
+    <div>
+      <dt>Avisos ya enviados</dt>
+      <dd>Identificadores de las ofertas ya publicadas, para no repetirlas en tu canal. Se eliminan automáticamente pasadas 25 horas.</dd>
+    </div>
+  </dl>
+
+  <h2 id="experimental">Zona Experimental</h2>
+  <p>Es opcional y solo funciona en los servidores que la activan. Si la usas, se guarda además:</p>
+  <dl class="legal-table">
+    <div>
+      <dt>ID de usuario de Discord</dt>
+      <dd>Para asociar cada oferta revisada a la persona que la registró.</dd>
+    </div>
+    <div>
+      <dt>Historial de ofertas</dt>
+      <dd>La oferta, su estado (Postulado, Omitido o Sin responder) y las fechas, para mostrar tu historial y el ranking del servidor.</dd>
+    </div>
+    <div>
+      <dt>Observaciones</dt>
+      <dd>Las notas opcionales que decidas escribir al registrar una oferta. Solo se muestran en el comando /debug.</dd>
+    </div>
+  </dl>
+  <p><strong>Quién ve qué:</strong> por defecto todos los comandos requieren el permiso Gestionar servidor, así que solo los administradores pueden ver el ranking (/snipers), el historial de otros usuarios (/applications @usuario) y las observaciones (/debug). Si das acceso a esos comandos a otros roles o personas, ellos también podrán verlos.</p>
+  <div class="callout info">
+    <strong>Ten en cuenta:</strong> apagar la Zona Experimental no borra lo ya guardado. Evita escribir en las observaciones contraseñas, documentos de identidad o datos de otras personas.
+  </div>
+
+  <h2 id="no-hacemos">Qué no hacemos</h2>
+  <ul>
+    <li>No leemos los mensajes del servidor: el bot funciona con comandos de barra.</li>
+    <li>No pedimos más permisos que ver canales, enviar mensajes e insertar enlaces.</li>
+    <li>No pedimos ni usamos tus contraseñas o cuentas de los portales de empleo.</li>
+    <li>No vendemos tus datos y no los usamos para publicidad.</li>
+  </ul>
+
+  <h2 id="uso">Cómo y dónde usamos los datos</h2>
+  <p>Solo para operar el bot: enviar alertas según tus filtros, mostrar el historial y el ranking del servidor, y mantener el servicio estable.</p>
+  <p>Los datos se almacenan en el servidor donde corre el bot, que administra el mantenedor del proyecto y que se aloja con un proveedor de hosting. Fuera de ese proveedor, no los compartimos con terceros.</p>
+  <p>Para consultar los portales, el bot envía búsquedas (palabras clave y ubicaciones, sin identificar usuarios ni servidores) a los portales de empleo, a veces a través de un proxy en Cloudflare Workers.</p>
+
+  <h2 id="avisos">Avisos de los portales</h2>
+  <p>Los avisos que publica el bot provienen de páginas públicas de cada portal, y cada alerta enlaza al aviso original. Job Sniper no tiene afiliación con esos portales: al abrir un aviso se aplican sus propias políticas de privacidad, que no controlamos.</p>
+
+  <h2 id="abierto">Código abierto</h2>
+  <p>El código es público, así que cualquiera puede revisarlo o proponer cambios. Esta página describe solo la instancia oficial del bot, la que se invita desde este sitio.</p>
+  <ul>
+    <li>Los issues, comentarios y pull requests en GitHub son públicos y se rigen por las políticas de GitHub.</li>
+  </ul>
+
+  <h2 id="eliminacion">Eliminación de datos</h2>
+  <p>Puedes pedir que eliminemos la configuración de tu servidor o tu historial de la Zona Experimental. Abre un <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">issue en GitHub</a> indicando qué quieres eliminar.</p>
+  <p>Los issues son públicos: no incluyas contraseñas, documentos ni otros datos privados.</p>
+
+  <h2 id="contacto">Cambios y contacto</h2>
+  <p>Podemos actualizar esta página cuando el bot cambie; la fecha de arriba indica la última revisión. Para dudas o solicitudes, escribe en los <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">issues de GitHub</a>. Si quieres ver cómo funciona por dentro, el código está en el <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">repositorio</a>.</p>
+</LegalLayout>

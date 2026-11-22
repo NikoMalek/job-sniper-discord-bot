@@ -1,0 +1,50 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+  heading: string;
+  intro: string;
+  updated: string; // YYYY-MM-DD
+  toc: { id: string; label: string }[];
+}
+
+const { title, heading, intro, updated, toc } = Astro.props;
+const updatedLabel = new Date(updated).toLocaleDateString('es-CL', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC'
+});
+---
+<BaseLayout title={title} description={intro}>
+  <section class="page-intro">
+    <div class="container">
+      <h1 class="page-title">{heading}</h1>
+      <p class="lead">{intro}</p>
+      <p class="legal-meta">Última actualización: <time datetime={updated}>{updatedLabel}</time></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="container legal-wrap">
+      <nav class="legal-toc" aria-label="En esta página">
+        <p class="legal-toc-title">En esta página</p>
+        <ul>
+          {toc.map((item) => (
+            <li><a href={`#${item.id}`}>{item.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+
+      <div class="legal-main">
+        <div class="legal-summary">
+          <slot name="summary" />
+        </div>
+        <article class="legal-doc">
+          <slot />
+        </article>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

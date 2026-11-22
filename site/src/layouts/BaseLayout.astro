@@ -1,0 +1,262 @@
+---
+import '../styles/global.css';
+import { INVITE_URL, GITHUB_URL, ISSUES_URL, NEW_ISSUE_URL, CONTRIBUTORS_URL } from '../config';
+
+const year = new Date().getFullYear();
+
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+}
+
+const {
+  title,
+  description = 'Job Sniper monitorea avisos públicos de portales de empleo y envía alertas a tu servidor de Discord con filtros por palabras clave, ubicación, idioma, portal y más.',
+  image = '/og.png'
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image, Astro.site);
+const pathname = Astro.url.pathname;
+const isActive = (href: string) => {
+  if (href === '/') return pathname === '/';
+  return pathname.startsWith(href);
+};
+---
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#1e1f22" />
+    <link rel="canonical" href={canonical.href} />
+    <link rel="icon" type="image/svg+xml" href="/avatar.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Job Sniper" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:image" content={ogImage.href} />
+    <meta property="og:locale" content="es_CL" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage.href} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@700&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <header class="site-header">
+      <div class="container nav-wrap">
+        <a class="brand" href="/" aria-label="Job Sniper, inicio">
+          <img class="brand-mark" src="/avatar.svg" alt="" width="40" height="40" decoding="async" />
+          <span class="brand-text">Job Sniper</span>
+        </a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Abrir menú">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </button>
+        <nav class="nav" id="site-nav" aria-label="Principal">
+          <a href="/" data-nav-home class:list={{ active: isActive('/') }}>Inicio</a>
+          <a href="/#funciones" data-nav-section="funciones">Funciones</a>
+          <a href="/#portales" data-nav-section="portales">Portales</a>
+          <a href="/#configuracion" data-nav-section="configuracion">Configuración</a>
+          <a href="/#comandos" data-nav-section="comandos">Comandos</a>
+          <a href="/experimental/" class:list={{ active: isActive('/experimental'), 'nav-tab': true }}>
+            <span>Zona Experimental</span>
+            <span class="nav-badge">Beta</span>
+          </a>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a class="nav-cta" href={INVITE_URL} target="_blank" rel="noopener noreferrer">Invitar</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="contenido">
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div class="footer-main">
+          <a class="footer-brand" href="/">
+            <img src="/avatar.svg" alt="" width="28" height="28" loading="lazy" decoding="async" />
+            <span>Job Sniper</span>
+          </a>
+          <p class="footer-lead">Alertas de empleo multiportal para tu servidor de Discord.<br/>Código abierto y configurable por servidor.</p>
+          <div class="footer-links">
+            <a href="/">Inicio</a>
+            <a href="/#portales">Portales</a>
+            <a href="/#comandos">Comandos</a>
+            <a href="/experimental/">Zona Experimental</a>
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">Soporte y reportes</a>
+            <a href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer">Proponer idea</a>
+            <a href="/#faq">Preguntas frecuentes</a>
+            <a href="/privacidad/">Privacidad</a>
+            <a href="/terminos/">Términos</a>
+          </div>
+          <p class="footer-note">Proyecto open-source · Sin afiliación con Discord ni portales de empleo. Los avisos provienen de páginas públicas y cada alerta enlaza al aviso original.</p>
+        </div>
+        <div class="footer-side">
+          <div class="footer-actions">
+            <button class="btn btn-secondary" type="button" data-copy={INVITE_URL} data-copy-label="Copiar enlace de invitación" data-copied-label="Copiado">Copiar enlace de invitación</button>
+            <a class="btn btn-primary" href={INVITE_URL} target="_blank" rel="noopener noreferrer">Invitar a Discord</a>
+          </div>
+          <p class="footer-copyright">© {year} Job Sniper · Hecho por <a href="https://github.com/NikoMalek" target="_blank" rel="noopener noreferrer">NikoMalek</a> y <a href={CONTRIBUTORS_URL} target="_blank" rel="noopener noreferrer">colaboradores</a></p>
+        </div>
+      </div>
+    </footer>
+
+    <script is:inline>
+      (() => {
+        const navToggle = document.querySelector('.nav-toggle');
+        const nav = document.querySelector('.nav');
+        if (navToggle && nav) {
+          navToggle.addEventListener('click', () => {
+            const open = nav.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
+          nav.querySelectorAll('a').forEach((a) => {
+            a.addEventListener('click', () => {
+              nav.classList.remove('open');
+              navToggle.setAttribute('aria-expanded', 'false');
+            });
+          });
+        }
+
+        async function copyText(text) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return true;
+          } catch {
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = text;
+              ta.setAttribute('readonly', '');
+              ta.style.position = 'fixed';
+              ta.style.opacity = '0';
+              document.body.appendChild(ta);
+              ta.select();
+              const ok = document.execCommand('copy');
+              document.body.removeChild(ta);
+              return ok;
+            } catch {
+              return false;
+            }
+          }
+        }
+
+        function flashCopied(el, label, copiedLabel) {
+          if (el.dataset.copyTimer) window.clearTimeout(Number(el.dataset.copyTimer));
+          const target = el.querySelector('[data-copy-text-target]') || el;
+          if (!el.dataset.copyOriginal) el.dataset.copyOriginal = label || target.textContent || '';
+          target.textContent = copiedLabel || 'Copiado';
+          el.classList.add('copied');
+          el.setAttribute('aria-live', 'polite');
+          const t = window.setTimeout(() => {
+            target.textContent = el.dataset.copyOriginal || label || '';
+            el.classList.remove('copied');
+            delete el.dataset.copyTimer;
+          }, 1400);
+          el.dataset.copyTimer = String(t);
+        }
+
+        document.addEventListener('click', async (e) => {
+          const target = e.target;
+          if (!(target instanceof Element)) return;
+          const copyEl = target.closest('[data-copy]');
+          if (!copyEl) return;
+          const text = copyEl.getAttribute('data-copy');
+          if (!text) return;
+          e.preventDefault();
+          const ok = await copyText(text);
+          if (ok) {
+            flashCopied(
+              copyEl,
+              copyEl.getAttribute('data-copy-label') || copyEl.textContent || '',
+              copyEl.getAttribute('data-copied-label') || 'Copiado'
+            );
+          } else {
+            window.prompt('Copia este texto:', text);
+          }
+        });
+
+        // Scrollspy para secciones del inicio (solo escritorio)
+        (() => {
+          const sectionLinks = Array.from(document.querySelectorAll('#site-nav [data-nav-section]'));
+          if (!sectionLinks.length) return;
+          const isHome = window.location.pathname === '/' || window.location.pathname === '/index.html';
+          if (!isHome) return;
+          if (!window.matchMedia('(min-width: 761px)').matches) return;
+
+          const homeLink = document.querySelector('#site-nav [data-nav-home]');
+          const sections = sectionLinks
+            .map((a) => document.getElementById(a.getAttribute('data-nav-section') || ''))
+            .filter((el) => el instanceof HTMLElement);
+          if (!sections.length) return;
+
+          let activeId = null;
+          function setActive(id) {
+            const next = id || null;
+            if (next === activeId) return;
+            activeId = next;
+            sectionLinks.forEach((a) => {
+              a.classList.toggle('active', a.getAttribute('data-nav-section') === next);
+            });
+            if (homeLink) homeLink.classList.toggle('active', !next);
+          }
+
+          const ratios = new Map();
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                ratios.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
+              });
+              let bestId = null;
+              let bestRatio = 0;
+              ratios.forEach((ratio, id) => {
+                if (ratio > bestRatio) {
+                  bestRatio = ratio;
+                  bestId = id;
+                }
+              });
+              if (bestRatio > 0.05) setActive(bestId);
+              else if (window.scrollY < 140) setActive(null);
+            },
+            { rootMargin: '-20% 0px -45% 0px', threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] }
+          );
+
+          sections.forEach((s) => observer.observe(s));
+
+          window.addEventListener(
+            'scroll',
+            () => {
+              if (window.scrollY < 140) setActive(null);
+            },
+            { passive: true }
+          );
+
+          sectionLinks.forEach((a) => {
+            a.addEventListener('click', () => {
+              setActive(a.getAttribute('data-nav-section'));
+            });
+          });
+
+          if (window.location.hash) {
+            const hash = window.location.hash.slice(1);
+            if (sections.some((s) => s.id === hash)) setActive(hash);
+          } else if (window.scrollY < 140) {
+            setActive(null);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

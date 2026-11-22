@@ -1,0 +1,391 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Cmd from '../components/Cmd.astro';
+import { INVITE_URL, GITHUB_URL, ISSUES_URL, NEW_ISSUE_URL, CHECK_INTERVAL_MIN, CONTRIBUTE_URL } from '../config';
+
+const portals = [
+  {
+    name: 'LinkedIn',
+    activation: 'Activo por defecto',
+    note: 'Búsqueda amplia por palabras clave y ubicación. Se actualiza de forma automática según la disponibilidad del portal.'
+  },
+  {
+    name: 'ChileTrabajos',
+    activation: '/add-portal chiletrabajos',
+    note: 'Solo Chile. Respeta la antigüedad del aviso cuando el portal la muestra y reconoce ciudades equivalentes.'
+  },
+  {
+    name: 'Get on Board',
+    activation: '/add-portal getonbrd',
+    note: 'Foco en LATAM y remoto. Filtra por antigüedad y ubicación; omite avisos sin fecha.'
+  },
+  {
+    name: 'Computrabajo',
+    activation: '/add-portal computrabajo',
+    note: 'Disponible en varios países de Latinoamérica. Usa el nombre de la ciudad o región tal como aparece en el portal.'
+  },
+  {
+    name: 'FirstJob',
+    activation: '/add-portal firstjob',
+    note: 'Disponible en CL, PE, CO, MX, AR, EC y Centroamérica. No indica fecha de publicación, por lo que no aplica el filtro de antigüedad (el bot igualmente evita enviarte avisos repetidos).'
+  }
+];
+
+const configCommands = [
+  { cmd: '/set-channel', desc: 'Define el canal donde se publicarán las alertas.' },
+  { cmd: '/set-location', desc: 'Reemplaza tus ubicaciones guardadas por una nueva.' },
+  { cmd: '/add-location', desc: 'Agrega hasta 3 ubicaciones para combinar búsquedas.' },
+  { cmd: '/remove-location', desc: 'Elimina una ubicación guardada.' },
+  { cmd: '/add-keyword', desc: 'Agrega palabras clave separadas por comas.' },
+  { cmd: '/remove-keyword', desc: 'Elimina palabras clave.' },
+  { cmd: '/set-max-age', desc: 'Define qué tan recientes deben ser las ofertas (de 10 minutos a 24 horas).' },
+  { cmd: '/add-language', desc: 'Filtra ofertas según los idiomas permitidos.' },
+  { cmd: '/add-portal', desc: 'Activa portales de empleo adicionales.' },
+  { cmd: '/add-blacklist-company', desc: 'Excluye empresas que no te interesan.' }
+];
+
+const queryCommands = [
+  { cmd: '/help', desc: 'Muestra una guía rápida dentro de Discord.' },
+  { cmd: '/status', desc: 'Revisa el estado del bot y los portales.' },
+  { cmd: '/list-keywords', desc: 'Muestra tus palabras clave guardadas y un resumen de tu configuración.' },
+  { cmd: '/list-locations', desc: 'Lista tus ubicaciones y qué portales las cubren.' },
+  { cmd: '/list-portals', desc: 'Muestra qué portales están activos o pausados.' },
+  { cmd: '/list-languages', desc: 'Lista los idiomas disponibles y activos.' }
+];
+---
+<BaseLayout title="Job Sniper — Alertas de empleo en Discord">
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <h1>Alertas de empleo multiportal, directo en tu Discord</h1>
+        <p class="lead">Job Sniper monitorea avisos públicos de portales de empleo, filtra según lo que buscas (palabras clave, ubicación, idioma y antigüedad) y publica los avisos directo en el canal de Discord que elijas. Cada servidor tiene sus propias reglas.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href={INVITE_URL} target="_blank" rel="noopener noreferrer">Invitar a Discord</a>
+          <a class="btn btn-secondary" href="#configuracion">Configuración rápida</a>
+        </div>
+        <p class="hero-note">Al invitarlo, deja activos los permisos solicitados (ver canales, enviar mensajes e insertar enlaces) para que pueda publicar las alertas.</p>
+        <ul class="hero-points" aria-label="Resumen">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            <span>Filtros a medida por servidor: canal, palabras clave, hasta 3 ubicaciones, idiomas, antigüedad, empresas excluidas y portales.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            <span>Sin canal definido no se envían avisos. Los portales se pausan o reactivan solos según las ubicaciones que elijas.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            <span>Control total de acceso: decide qué roles o personas pueden configurar el bot desde los ajustes de tu servidor.</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+            <span>Código abierto: revisa cómo funciona y aporta desde GitHub.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="hero-visual">
+        <div class="preview-shell">
+          <div class="preview-top">
+            <div class="preview-title">Ejemplo de alerta en Discord</div>
+          </div>
+          <div class="preview-stage">
+            <div class="discord-frame">
+              <div class="discord-channel">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 7h14M5 12h10M5 17h14"></path></svg>
+                <span>alertas-empleo</span>
+              </div>
+              <div class="discord-body">
+                <div class="discord-msg">
+                  <div class="discord-avatar" aria-hidden="true">
+                    <img src="/avatar.svg" alt="" decoding="async" />
+                  </div>
+                  <div class="discord-content">
+                    <div class="discord-head">
+                      <span class="discord-name">Job Sniper</span>
+                      <span class="app-tag">APP</span>
+                      <span class="discord-time">hoy a las 10:24</span>
+                    </div>
+                    <div class="d-embed">
+                      <div class="d-main">
+                        <div class="d-author"><img src="/portals/linkedin.svg" alt="" loading="lazy" decoding="async" /><span>Nueva vacante · LinkedIn</span></div>
+                        <h3 class="d-title"><span class="d-link">Backend Developer Python</span></h3>
+                        <p class="d-desc">Buscamos desarrollador backend con experiencia en Python, APIs y bases de datos para integrarse a un equipo remoto… <span class="d-link">Ver más...</span></p>
+                        <div class="d-fields">
+                          <div>
+                            <div class="d-label">Empresa</div>
+                            <div class="d-value">Job Sniper</div>
+                          </div>
+                          <div>
+                            <div class="d-label">Ubicación</div>
+                            <div class="d-value">Santiago, Chile (Remoto)</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="d-thumb" aria-hidden="true"><img src="/avatar.svg" alt="" decoding="async" /></div>
+                      <div class="d-footer">Fuente: LinkedIn • Publicada: hace 2 horas</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="preview-caption">Así se publica una alerta estándar en tu canal cuando una oferta coincide con tus filtros.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="funciones">
+    <div class="container">
+      <div class="section-head">
+        <h2>Qué hace Job Sniper</h2>
+        <p>Centraliza tu búsqueda laboral en Discord: detecta vacantes recientes en distintos portales y filtra el ruido para que no tengas que revisar cada sitio a mano.</p>
+      </div>
+      <div class="feature-layout">
+        <article class="panel feature-lead">
+          <h3>Alertas configurables por servidor</h3>
+          <p>Elige el canal de destino con <Cmd c="/set-channel" /> y combina palabras clave, ubicaciones, idiomas, antigüedad y empresas excluidas para recibir solo lo que te interesa.</p>
+          <p class="highlight">Independiente por servidor, personalizable y pensado para tu flujo diario.</p>
+        </article>
+        <div class="feature-list" aria-label="Capacidades">
+          <article class="feature-item">
+            <h3>Filtros precisos</h3>
+            <p>Combina palabras clave, idiomas, tiempo desde la publicación y bloqueo de empresas para descartar ofertas que no aplican.</p>
+          </article>
+          <article class="feature-item">
+            <h3>Ubicaciones flexibles</h3>
+            <p>Guarda hasta 3 ubicaciones (puedes combinar varias). Formatos admitidos: <code>Remoto</code>, <code>Remoto, País</code>, <code>País</code>, <code>Ciudad, País</code> y <code>Worldwide</code>.</p>
+          </article>
+          <article class="feature-item">
+            <h3>Cobertura por portal</h3>
+            <p>Si un portal no opera en tus ubicaciones guardadas, queda pausado automáticamente y vuelve a activarse si agregas una región compatible.</p>
+          </article>
+          <article class="feature-item">
+            <h3>Estado y visibilidad</h3>
+            <p>Revisa tu configuración activa en cualquier momento con <Cmd c="/status" />, <Cmd c="/list-portals" /> y <Cmd c="/list-keywords" />.</p>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="portales">
+    <div class="container">
+      <div class="section-head">
+        <h2>Portales soportados y cobertura</h2>
+        <p>Activa los portales que necesites en tu servidor. Cada uno tiene su propio alcance geográfico y reglas de filtrado.</p>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Portal</th>
+              <th>Activación</th>
+              <th>Cobertura y notas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {portals.map((portal) => (
+              <tr>
+                <td><strong>{portal.name}</strong></td>
+                <td>
+                  {portal.activation.startsWith('/') ? (
+                    <Cmd c={portal.activation} />
+                  ) : (
+                    <span class="badge ok">{portal.activation}</span>
+                  )}
+                </td>
+                <td>{portal.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted small" style="margin-top:0.8rem">Usa <Cmd c="/list-portals" /> y <Cmd c="/list-locations" /> en tu servidor para confirmar qué portales están activos o pausados.</p>
+    </div>
+  </section>
+
+  <section id="configuracion">
+    <div class="container">
+      <div class="section-head">
+        <h2>Configuración rápida</h2>
+        <p>Tres pasos para empezar a recibir ofertas en tu servidor.</p>
+      </div>
+      <div class="split">
+        <div class="panel">
+          <div class="steps">
+            <div class="step">
+              <div class="step-label">Paso 1</div>
+              <div>
+                <h3>Elige el canal de avisos</h3>
+                <p>Ejecuta <Cmd c="/set-channel" /> en el canal donde quieres recibir las vacantes.</p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-label">Paso 2</div>
+              <div>
+                <h3>Define la ubicación</h3>
+                <p>Configura una ubicación inicial con <Cmd c="/set-location" />. Puedes sumar hasta 3 con <Cmd c="/add-location" />.</p>
+                <p style="margin-top:0.45rem">Formatos que puedes usar:</p>
+                <ul class="plain-list" style="margin-top:0.3rem">
+                  <li><code>Remoto</code> — trabajo remoto (sin país específico)</li>
+                  <li><code>Remoto, País</code> — remoto en un país (ej. <code>Remoto, Chile</code>)</li>
+                  <li><code>País</code> — ofertas en un país (ej. <code>Chile</code>)</li>
+                  <li><code>Ciudad, País</code> — ofertas en una ciudad (ej. <code>Santiago, Chile</code>)</li>
+                  <li><code>Worldwide</code> — cualquier lugar/modalidad (búsqueda general)</li>
+                </ul>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-label">Paso 3</div>
+              <div>
+                <h3>Agrega tus palabras clave</h3>
+                <p>Usa <Cmd c="/add-keyword" /> con los cargos o tecnologías que buscas (ej. <code>python, backend</code>).</p>
+              </div>
+            </div>
+          </div>
+          <div class="callout info" style="margin-top:1rem">
+            <strong>Permisos de comandos:</strong> por defecto, solo los <strong>administradores del servidor</strong> pueden configurar el bot. Si quieres dar acceso a otros roles o miembros, hazlo desde Discord en <strong>Ajustes del servidor → Integraciones → Job Sniper → Comandos</strong>.
+          </div>
+          <div class="note-box"><strong>Consejo:</strong> ejecuta <Cmd c="/status" /> dentro de Discord para verificar que todo quedó listo.</div>
+        </div>
+
+        <div class="panel">
+          <h3>Antes de esperar la primera alerta</h3>
+          <ul class="check-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+              <span>Definiste un canal de avisos con <code>/set-channel</code>.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+              <span>Configuraste al menos una ubicación y tus palabras clave.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+              <span>Activaste los portales e idiomas que coinciden con tu búsqueda.</span>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+              <span>Revisaste quién tiene permiso para ejecutar los comandos del bot en tu servidor.</span>
+            </li>
+          </ul>
+          <p class="muted small" style="margin-top:1rem">Comprueba el estado general con <Cmd c="/status" />, <Cmd c="/list-portals" /> y <Cmd c="/list-locations" />.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="comandos">
+    <div class="container">
+      <div class="section-head">
+        <h2>Comandos principales</h2>
+        <p>Haz clic sobre cualquier comando para copiarlo y pegarlo en Discord.</p>
+      </div>
+      <div class="cmd-columns">
+        <article class="panel cmd-group">
+          <h3>Configuración</h3>
+          <p>Define canal, filtros, portales e idiomas.</p>
+          <div class="cmd-list">
+            {configCommands.map((item) => (
+              <div class="cmd-row">
+                <Cmd c={item.cmd} hint />
+                <span class="cmd-desc">{item.desc}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article class="panel cmd-group">
+          <h3>Consulta</h3>
+          <p>Revisa el estado y los filtros activos.</p>
+          <div class="cmd-list">
+            {queryCommands.map((item) => (
+              <div class="cmd-row">
+                <Cmd c={item.cmd} hint />
+                <span class="cmd-desc">{item.desc}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="panel cta-panel">
+        <h2>Zona Experimental <span class="nav-badge">Beta</span></h2>
+        <p>Registra si postulaste, omitiste o no te respondieron, y revisa tu historial y el ranking del servidor. Es opcional y la puedes apagar sin interrupciones.</p>
+        <div class="cta-row">
+          <a class="btn btn-secondary" href="/experimental/">Conocer la Zona Experimental</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <section id="faq">
+    <div class="container">
+      <div class="section-head">
+        <h2>Preguntas frecuentes</h2>
+      </div>
+      <div class="panel faq">
+        <details>
+          <summary>¿Es gratis?</summary>
+            <p>Sí, usar el bot es gratis. Corre en un servidor propio con recursos limitados, así que si el uso crece puede aumentar el intervalo de revisión o aplicarse límites. El código es abierto y puedes revisarlo o contribuir desde <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">GitHub</a>.</p>
+        </details>
+        <details>
+          <summary>¿Cada cuánto busca nuevas ofertas?</summary>
+          <p>Actualmente el bot revisa los portales cada {CHECK_INTERVAL_MIN} minutos aproximadamente. Este intervalo puede ajustarse si el uso crece y hay que cuidar la estabilidad del servicio, así que no es una garantía de tiempo exacto. Además, un aviso puede tardar en aparecer en el propio portal antes de que el bot lo detecte.</p>
+        </details>
+        <details>
+          <summary>¿Puedo aportar al proyecto?</summary>
+          <p>Sí. El código del bot, de cómo obtiene y filtra los avisos y de esta web está en GitHub. Ahí se explica <a href={CONTRIBUTE_URL} target="_blank" rel="noopener noreferrer">cómo aportar</a>: reportar errores, proponer funciones, sumar un portal o mejorar el código.</p>
+        </details>
+        <details>
+          <summary>¿Qué datos guarda?</summary>
+          <p>Guardamos la configuración de cada servidor y, solo si la Zona Experimental está activa, el historial de ofertas revisadas con sus estados y observaciones. Los datos se usan solo para operar el bot y no se venden ni se comparten con terceros; los detalles están en <a href="/privacidad/">Privacidad</a>.</p>
+        </details>
+        <details>
+          <summary>¿Quién puede configurar el bot?</summary>
+          <p>Por defecto, los administradores del servidor. Puedes dar acceso a otros roles desde Ajustes del servidor → Integraciones → Job Sniper → Comandos.</p>
+        </details>
+        <details>
+          <summary>¿Por qué no me llegan avisos?</summary>
+          <ul class="plain-list">
+            <li>Canal definido con <Cmd c="/set-channel" />.</li>
+            <li>Al menos una ubicación y palabra clave.</li>
+            <li>Portales activos para tu ubicación (revisa con <Cmd c="/list-portals" />).</li>
+            <li><Cmd c="/status" /> para ver el estado general.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>¿Qué pasa si un portal no cubre mi ubicación?</summary>
+          <p>Queda pausado automáticamente y se reactiva si agregas una región compatible.</p>
+        </details>
+        <details>
+          <summary>¿Es un servicio oficial de los portales?</summary>
+          <p>No. Job Sniper no tiene afiliación con los portales: monitorea avisos públicos y cada alerta enlaza al aviso original.</p>
+        </details>
+        <details>
+          <summary>¿Cómo reporto un error o propongo una idea?</summary>
+          <p><a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">Reportar un error</a> o <a href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer">proponer una idea</a>.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <div class="panel cta-panel">
+        <h2>Proyecto abierto a ideas y mejoras</h2>
+        <p>Job Sniper es de código abierto. Si quieres revisar cómo funciona por dentro, pedir soporte para un portal nuevo, reportar un error o proponer una función, pásate por el repositorio.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Ver en GitHub</a>
+          <a class="btn btn-secondary" href={NEW_ISSUE_URL} target="_blank" rel="noopener noreferrer">Proponer una idea o portal</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,21 @@
+{
+  "name": "job-sniper-site",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "generate:og": "node scripts/generate-og.mjs",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "3.7.0",
+    "astro": "^5.7.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
+  }
+}

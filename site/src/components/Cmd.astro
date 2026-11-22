@@ -1,0 +1,4 @@
+---
+const { c, label = c, hint = false, style } = Astro.props;
+---
+<button type="button" class="cmd-copy" data-copy={c} data-copy-label={label} data-copied-label="Copiado" style={style}><span data-copy-text-target>{label}</span>{hint && <span class="copy-hint"></span>}</button>
