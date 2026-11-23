@@ -2,7 +2,7 @@
  * Job Sniper outbound proxy for Cloudflare Workers (free plan).
  *
  * The bot uses this Worker when it cannot reach a portal directly, or as a
- * fallback after a portal rate-limits the Railway IP. It only forwards GET
+ * fallback after a portal rate-limits the server's IP. It only forwards GET
  * requests to hosts listed in ALLOWED_HOSTS, so it cannot be abused as an
  * open proxy.
  *

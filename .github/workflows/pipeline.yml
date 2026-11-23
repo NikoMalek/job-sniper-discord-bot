@@ -1,0 +1,70 @@
+name: Pipeline
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "requirements*.txt"
+      - "pytest.ini"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/pipeline.yml"
+  push:
+    branches: [dev, main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "requirements*.txt"
+      - "pytest.ini"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/pipeline.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - run: pip install -r requirements-dev.txt
+      - run: pytest -q
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t job-sniper-bot:ci .
+
+  deploy:
+    name: Deploy
+    needs: [test, docker]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
+    steps:
+      - name: Trigger Dokploy deploy
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+        run: |
+          curl --fail-with-body -sS -X POST "${DOKPLOY_WEBHOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -d "{\"ref\": \"refs/heads/${GITHUB_REF_NAME}\", \"head_commit\": {\"id\": \"${GITHUB_SHA}\", \"message\": \"Deploy ${GITHUB_SHA}\"}}"
