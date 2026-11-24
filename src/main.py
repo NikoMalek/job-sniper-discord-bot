@@ -1,4 +1,4 @@
-"""Process entry point for the Railway worker."""
+"""Process entry point for the bot worker."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 class _BelowWarningFilter(logging.Filter):
-    """Keep warning/error records out of stdout so Railway does not paint them red."""
+    """Keep warning/error records out of stdout so log viewers can tell them apart."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         return record.levelno < logging.WARNING
