@@ -55,7 +55,7 @@ def build_setup_embed() -> discord.Embed:
             "**LinkedIn** y acepta todos los idiomas.\n"
             "Puedes activar otros portales con `/add-portal` "
             "(por ejemplo `chiletrabajos` o `getonbrd`). Para ajustar la "
-            "antigüedad, empresas ignoradas, idiomas y portales, usa `/help`."
+            "antigüedad, palabras o empresas ignoradas, idiomas y portales, usa `/help`."
         ),
         inline=False,
     )

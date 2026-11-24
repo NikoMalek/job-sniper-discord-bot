@@ -132,6 +132,12 @@ Comandos:
 - `/add-blacklist-company` y `/remove-blacklist-company`: ignora o reactiva
   empresas específicas, aceptando coincidencias parciales sin distinguir
   mayúsculas.
+- `/add-blacklist-keyword` y `/remove-blacklist-keyword`: excluye o vuelve a
+  permitir vacantes cuyo título contenga ciertas palabras clave (por ejemplo
+  `practicante, docente`), normalizando mayúsculas y acentos. Acepta varias
+  palabras separadas por comas y ofrece la opción `incluir_alias` para sumar
+  automáticamente variantes comunes (por ejemplo, `practica` agrega también
+  `practicante`, `pasante`, `intern`, `trainee`, etc.).
 - `/add-language` y `/remove-language`: configura idiomas permitidos,
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.
