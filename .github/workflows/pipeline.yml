@@ -62,9 +62,11 @@ jobs:
     steps:
       - name: Trigger Dokploy deploy
         env:
-          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
         run: |
-          curl --fail-with-body -sS -X POST "${DOKPLOY_WEBHOOK_URL}" \
+          curl --fail-with-body -sS -X POST "${DOKPLOY_URL%/}/api/application.deploy" \
             -H "Content-Type: application/json" \
-            -H "X-GitHub-Event: push" \
-            -d "{\"ref\": \"refs/heads/${GITHUB_REF_NAME}\", \"head_commit\": {\"id\": \"${GITHUB_SHA}\", \"message\": \"Deploy ${GITHUB_SHA}\"}}"
+            -H "x-api-key: ${DOKPLOY_API_KEY}" \
+            -d "{\"applicationId\": \"${APPLICATION_ID}\"}"
