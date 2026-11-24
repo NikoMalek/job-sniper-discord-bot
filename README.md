@@ -32,9 +32,8 @@ portales](#proxy-opcional-para-portales). Para pruebas locales, usa
 El proyecto incluye un Worker en
 [`worker/job-sniper-proxy.js`](worker/job-sniper-proxy.js), diseñado para
 desplegarse en Cloudflare Workers y actuar como proxy de salida hacia los
-portales de empleo. Esto permite que una plataforma de despliegue, como
-Railway, pueda consultar sitios a los que no llega directamente o cuya IP
-bloquea las peticiones.
+portales de empleo. Esto permite que un servidor o plataforma de despliegue (un VPS, un PaaS, etc.)
+pueda consultar sitios a los que no llega directamente o cuya IP bloquea las peticiones.
 
 El comportamiento actual es:
 
@@ -85,7 +84,7 @@ JOB_PROXY_TOKEN=<el mismo valor del Secret>
 JOB_PROXY_MODE=
 ```
 
-En un entorno desplegado, por ejemplo Railway, `JOB_PROXY_MODE` vacío deja el
+En un entorno desplegado (VPS, contenedor, etc.), `JOB_PROXY_MODE` vacío deja el
 modo automático por portal. También se puede usar `fallback` o `always` para
 forzar un comportamiento común.
 
