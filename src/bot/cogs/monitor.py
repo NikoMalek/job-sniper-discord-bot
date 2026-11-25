@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
 import unicodedata
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -31,56 +33,23 @@ LOGGER = logging.getLogger(__name__)
 
 COALESCE_SECONDS = 20.0
 
-KEYWORD_ALIASES: dict[str, tuple[str, ...]] = {
-    "ingeniero de software": ("software engineer",),
-    "ingeniera de software": ("software engineer",),
-    "frontend": ("front-end", "front end"),
-    "backend": ("back-end", "back end"),
-    "fullstack": ("full stack", "full-stack"),
-    "devops": ("dev-ops", "dev ops"),
-    "informatica": ("informática",),
-}
-BLACKLIST_KEYWORD_ALIAS_GROUPS: tuple[tuple[str, ...], ...] = (
-    (
-        "practica",
-        "practicante",
-        "practicas",
-        "practicantes",
-        "alumno en practica",
-        "alumna en practica",
-        "pasante",
-        "pasantia",
-        "intern",
-        "internship",
-        "trainee",
-        "becario",
-        "becaria",
-    ),
-    (
-        "docente",
-        "docentes",
-        "profesor",
-        "profesora",
-        "relator",
-        "relatora",
-        "instructor",
-        "instructora",
-        "ayudante",
-        "academico",
-        "academica",
-    ),
-    (
-        "senior",
-        "sr",
-        "lead",
-        "principal",
-        "staff",
-    ),
-    (
-        "junior",
-        "jr",
-    ),
-)
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+KEYWORD_ALIASES_FILE = _DATA_DIR / "keyword_aliases.json"
+BLACKLIST_KEYWORD_ALIAS_GROUPS_FILE = _DATA_DIR / "blacklist_keyword_alias_groups.json"
+
+
+def _load_keyword_aliases() -> dict[str, tuple[str, ...]]:
+    payload = json.loads(KEYWORD_ALIASES_FILE.read_text(encoding="utf-8"))
+    return {str(key): tuple(str(value) for value in values) for key, values in payload.items()}
+
+
+def _load_blacklist_keyword_alias_groups() -> tuple[tuple[str, ...], ...]:
+    payload = json.loads(BLACKLIST_KEYWORD_ALIAS_GROUPS_FILE.read_text(encoding="utf-8"))
+    return tuple(tuple(str(value) for value in group) for group in payload)
+
+
+KEYWORD_ALIASES: dict[str, tuple[str, ...]] = _load_keyword_aliases()
+BLACKLIST_KEYWORD_ALIAS_GROUPS: tuple[tuple[str, ...], ...] = _load_blacklist_keyword_alias_groups()
 LANGUAGE_MAP = {
     "spanish": Language.SPANISH,
     "english": Language.ENGLISH,

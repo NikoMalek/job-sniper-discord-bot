@@ -135,9 +135,12 @@ Comandos:
 - `/add-blacklist-keyword` y `/remove-blacklist-keyword`: excluye o vuelve a
   permitir vacantes cuyo título contenga ciertas palabras clave (por ejemplo
   `practicante, docente`), normalizando mayúsculas y acentos. Acepta varias
-  palabras separadas por comas y ofrece la opción `incluir_alias` para sumar
-  automáticamente variantes comunes (por ejemplo, `practica` agrega también
-  `practicante`, `pasante`, `intern`, `trainee`, etc.).
+  palabras separadas por comas. El comando tiene la opción **`incluir_alias`**:
+  si eliges **Sí**, agrega automáticamente variantes comunes relacionadas (por
+  ejemplo, `practica` agrega también `practicante`, `pasante`, `intern`,
+  `trainee`, etc.); si eliges **No**, solo se agregan las palabras indicadas.
+  Los grupos de alias se pueden editar en
+  `src/data/blacklist_keyword_alias_groups.json`.
 - `/add-language` y `/remove-language`: configura idiomas permitidos,
   por ejemplo `español, inglés`. La lista aparece en `/list-keywords`.
 - `/list-languages`: muestra los idiomas disponibles y los activos.

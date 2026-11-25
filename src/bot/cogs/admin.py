@@ -450,7 +450,7 @@ class AdminCog(commands.Cog):
 
     @app_commands.command(
         name="add-blacklist-keyword",
-        description="Ignora vacantes cuyo título contenga ciertas palabras clave.",
+        description="Ignora vacantes por palabras en el título (opcional: incluir alias comunes).",
     )
     @app_commands.describe(
         keyword="Palabras a excluir en el título, separadas por comas (ej. practicante, docente).",
