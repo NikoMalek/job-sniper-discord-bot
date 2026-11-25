@@ -26,6 +26,7 @@ from ...locations import (
     parse_location_or_none,
 )
 from ...scrapers import SCRAPERS, portal_names
+from .monitor import MonitorCog
 
 if TYPE_CHECKING:
     from ..client import JobSniperBot
@@ -447,6 +448,122 @@ class AdminCog(commands.Cog):
         message = "Empresa eliminada de la blacklist." if removed else "No encontré esa empresa."
         await interaction.response.send_message(message, ephemeral=True)
 
+    @app_commands.command(
+        name="add-blacklist-keyword",
+        description="Ignora vacantes por palabras en el título (opcional: incluir alias comunes).",
+    )
+    @app_commands.describe(
+        keyword="Palabras a excluir en el título, separadas por comas (ej. practicante, docente).",
+        incluir_alias="Si es Sí, agrega también variantes comunes (ej. práctica → practicante, pasante, intern).",
+    )
+    @app_commands.choices(
+        incluir_alias=[
+            app_commands.Choice(name="Sí (incluir alias comunes)", value=1),
+            app_commands.Choice(name="No (solo las palabras indicadas)", value=0),
+        ]
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def add_blacklist_keyword(
+        self,
+        interaction: discord.Interaction,
+        keyword: str,
+        incluir_alias: app_commands.Choice[int] | None = None,
+    ) -> None:
+        try:
+            raw_keywords = [
+                self._clean(value, "La palabra clave a excluir")
+                for value in keyword.split(",")
+                if value.strip()
+            ]
+        except ValueError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
+            return
+        if not raw_keywords:
+            await interaction.response.send_message(
+                "Debes indicar al menos una palabra clave para excluir.",
+                ephemeral=True,
+            )
+            return
+
+        use_aliases = bool(incluir_alias and incluir_alias.value == 1)
+        expanded, auto_aliases = MonitorCog.expand_blacklist_keywords(
+            raw_keywords, include_aliases=use_aliases
+        )
+        auto_set = set(auto_aliases)
+        guild_id = interaction.guild_id or 0
+        added_main: list[str] = []
+        added_aliases: list[str] = []
+        for value in expanded:
+            if await self.database.add_blacklisted_keyword(guild_id, value):
+                if value in auto_set:
+                    added_aliases.append(value)
+                else:
+                    added_main.append(value)
+
+        parts: list[str] = []
+        if added_main:
+            parts.append(
+                f"Palabras excluidas en títulos agregadas: **{', '.join(added_main)}**."
+            )
+        if added_aliases:
+            parts.append(
+                f"Alias comunes incluidos automáticamente: **{', '.join(added_aliases)}**."
+            )
+        if not parts:
+            parts.append("Todas esas palabras ya estaban en la lista de exclusión.")
+        await interaction.response.send_message("\n".join(parts), ephemeral=True)
+
+    @app_commands.command(
+        name="remove-blacklist-keyword",
+        description="Deja de ignorar vacantes con una palabra clave excluida.",
+    )
+    @app_commands.describe(
+        keyword="Palabra o palabras separadas por comas que quieres quitar de la exclusión."
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def remove_blacklist_keyword(
+        self, interaction: discord.Interaction, keyword: str
+    ) -> None:
+        keywords = [
+            " ".join(value.split()).strip()
+            for value in keyword.split(",")
+            if value.strip()
+        ]
+        if not keywords:
+            await interaction.response.send_message(
+                "Debes indicar al menos una palabra clave.",
+                ephemeral=True,
+            )
+            return
+        removed_keywords = [
+            value
+            for value in dict.fromkeys(keywords)
+            if await self.database.remove_blacklisted_keyword(
+                interaction.guild_id or 0, value
+            )
+        ]
+        if removed_keywords:
+            message = f"Palabras excluidas eliminadas: **{', '.join(removed_keywords)}**."
+        else:
+            message = "No encontré ninguna de esas palabras en la lista de exclusión."
+        await interaction.response.send_message(message, ephemeral=True)
+
+    @remove_blacklist_keyword.autocomplete("keyword")
+    async def remove_blacklist_keyword_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        if interaction.guild_id is None:
+            return []
+        config = await self.database.get_guild_config(interaction.guild_id)
+        normalized_current = normalize(current)
+        return [
+            app_commands.Choice(name=kw, value=kw)
+            for kw in config.blacklisted_keywords
+            if normalized_current in normalize(kw)
+        ][:25]
+
     @app_commands.command(name="help", description="Muestra cómo configurar Job Sniper.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
@@ -487,7 +604,10 @@ class AdminCog(commands.Cog):
                 "cobertura: si todas tus ubicaciones quedan fuera, se pausa "
                 "automáticamente.\n"
                 "`/add-blacklist-company` y `/remove-blacklist-company` — "
-                "ignora o vuelve a permitir empresas."
+                "ignora o vuelve a permitir empresas.\n"
+                "`/add-blacklist-keyword` y `/remove-blacklist-keyword` — "
+                "excluye o vuelve a permitir palabras en el título de la oferta "
+                "(ej. `practicante, docente`), con opción de incluir alias comunes."
             ),
             inline=False,
         )
@@ -772,6 +892,11 @@ class AdminCog(commands.Cog):
             else f"**{DEFAULT_LOCATION}** (por defecto)"
         )
         keywords = ", ".join(config.keywords) if config.keywords else "Ninguna"
+        blacklisted_keywords = (
+            ", ".join(config.blacklisted_keywords)
+            if config.blacklisted_keywords
+            else "Ninguna"
+        )
         blacklist = ", ".join(config.blacklisted_companies) if config.blacklisted_companies else "Ninguna"
         languages = ", ".join(config.languages) if config.languages else "Todos"
         portals = self._portal_summary(config.portals, intents)
@@ -782,6 +907,7 @@ class AdminCog(commands.Cog):
             f"**Portales:** {portals}",
             f"**Antigüedad máxima:** {self._format_age(config.max_age_hours)}",
             f"**Palabras clave:** {keywords}",
+            f"**Palabras excluidas:** {blacklisted_keywords}",
             f"**Empresas ignoradas:** {blacklist}",
             f"**Idiomas:** {languages}",
         ]

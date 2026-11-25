@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
 import unicodedata
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import discord
@@ -31,15 +33,23 @@ LOGGER = logging.getLogger(__name__)
 
 COALESCE_SECONDS = 20.0
 
-KEYWORD_ALIASES: dict[str, tuple[str, ...]] = {
-    "ingeniero de software": ("software engineer",),
-    "ingeniera de software": ("software engineer",),
-    "frontend": ("front-end", "front end"),
-    "backend": ("back-end", "back end"),
-    "fullstack": ("full stack", "full-stack"),
-    "devops": ("dev-ops", "dev ops"),
-    "informatica": ("informática",),
-}
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+KEYWORD_ALIASES_FILE = _DATA_DIR / "keyword_aliases.json"
+BLACKLIST_KEYWORD_ALIAS_GROUPS_FILE = _DATA_DIR / "blacklist_keyword_alias_groups.json"
+
+
+def _load_keyword_aliases() -> dict[str, tuple[str, ...]]:
+    payload = json.loads(KEYWORD_ALIASES_FILE.read_text(encoding="utf-8"))
+    return {str(key): tuple(str(value) for value in values) for key, values in payload.items()}
+
+
+def _load_blacklist_keyword_alias_groups() -> tuple[tuple[str, ...], ...]:
+    payload = json.loads(BLACKLIST_KEYWORD_ALIAS_GROUPS_FILE.read_text(encoding="utf-8"))
+    return tuple(tuple(str(value) for value in group) for group in payload)
+
+
+KEYWORD_ALIASES: dict[str, tuple[str, ...]] = _load_keyword_aliases()
+BLACKLIST_KEYWORD_ALIAS_GROUPS: tuple[tuple[str, ...], ...] = _load_blacklist_keyword_alias_groups()
 LANGUAGE_MAP = {
     "spanish": Language.SPANISH,
     "english": Language.ENGLISH,
@@ -155,6 +165,54 @@ class MonitorCog(commands.Cog):
             elif cls._contains_term(description, variant):
                 return True
         return False
+
+    @classmethod
+    def expand_blacklist_keywords(
+        cls, keywords: list[str], *, include_aliases: bool = False
+    ) -> tuple[list[str], list[str]]:
+        """Return (all_keywords_to_add, auto_added_aliases)."""
+        base_terms: list[str] = []
+        seen_normalized: set[str] = set()
+        for value in keywords:
+            norm = cls._normalize(value)
+            if not norm or norm in seen_normalized:
+                continue
+            seen_normalized.add(norm)
+            base_terms.append(value)
+
+        if not include_aliases:
+            return base_terms, []
+
+        aliases_added: list[str] = []
+        result = list(base_terms)
+        for value in base_terms:
+            norm = cls._normalize(value)
+            for group in BLACKLIST_KEYWORD_ALIAS_GROUPS:
+                if norm in group:
+                    for candidate in group:
+                        if candidate not in seen_normalized:
+                            seen_normalized.add(candidate)
+                            result.append(candidate)
+                            aliases_added.append(candidate)
+        return result, aliases_added
+
+    @classmethod
+    def _matches_blacklisted_keyword(
+        cls, job: Job, blacklisted_keywords: list[str]
+    ) -> str | None:
+        """Return the first blacklisted keyword matched in the job title, or None."""
+        if not blacklisted_keywords:
+            return None
+        title = job.title
+        if not title:
+            return None
+        for blocked in blacklisted_keywords:
+            if not blocked or not blocked.strip():
+                continue
+            for variant in cls._keyword_variants(blocked):
+                if cls._contains_term(title, variant):
+                    return blocked
+        return None
 
     @classmethod
     def _matches_language(cls, job: Job, languages: list[str]) -> bool:
@@ -427,6 +485,7 @@ class MonitorCog(commands.Cog):
             "language_skips": 0,
             "keyword_skips": 0,
             "blacklist_skips": 0,
+            "blacklist_keyword_skips": 0,
             "send_failures": 0,
         }
         sent_by_source: dict[str, int] = {}
@@ -457,6 +516,30 @@ class MonitorCog(commands.Cog):
                 LOGGER.info(
                     "Skipping blacklisted company %s for job group [%s] in guild %s",
                     blocked_job.company,
+                    group_label,
+                    config.guild_id,
+                )
+                continue
+            blocked_keyword_hit = next(
+                (
+                    (job, matched_kw)
+                    for job in group
+                    if (
+                        matched_kw := self._matches_blacklisted_keyword(
+                            job, config.blacklisted_keywords
+                        )
+                    )
+                    is not None
+                ),
+                None,
+            )
+            if blocked_keyword_hit is not None:
+                hit_job, matched_kw = blocked_keyword_hit
+                counters["blacklist_keyword_skips"] += len(group)
+                LOGGER.info(
+                    "Skipping blacklisted keyword %r in title %r for job group [%s] in guild %s",
+                    matched_kw,
+                    hit_job.title,
                     group_label,
                     config.guild_id,
                 )
@@ -529,7 +612,7 @@ class MonitorCog(commands.Cog):
             "Guild %s flush finished: portals=%s sent_by_source=%s unique=%d "
             "sent_messages=%d sent_variants=%d duplicate_groups=%d grouped_jobs=%d "
             "already_seen=%d language_skips=%d keyword_skips=%d blacklist_skips=%d "
-            "send_failures=%d",
+            "blacklist_keyword_skips=%d send_failures=%d",
             config.guild_id,
             ", ".join(
                 f"{source}:{count}" for source, count in scraped_by_source.items()
@@ -548,6 +631,7 @@ class MonitorCog(commands.Cog):
             counters["language_skips"],
             counters["keyword_skips"],
             counters["blacklist_skips"],
+            counters["blacklist_keyword_skips"],
             counters["send_failures"],
         )
 

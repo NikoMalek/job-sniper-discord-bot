@@ -41,6 +41,8 @@ const configCommands = [
   { cmd: '/set-max-age', desc: 'Define qué tan recientes deben ser las ofertas (de 10 minutos a 24 horas).' },
   { cmd: '/add-language', desc: 'Filtra ofertas según los idiomas permitidos.' },
   { cmd: '/add-portal', desc: 'Activa portales de empleo adicionales.' },
+  { cmd: '/add-blacklist-keyword', desc: 'Excluye ofertas por palabras en el título (ej. practicante, docente). Usa "incluir_alias" para sumar variantes comunes automáticamente.' },
+  { cmd: '/remove-blacklist-keyword', desc: 'Elimina palabras de la lista de exclusión.' },
   { cmd: '/add-blacklist-company', desc: 'Excluye empresas que no te interesan.' }
 ];
 
