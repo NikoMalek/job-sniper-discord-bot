@@ -34,7 +34,7 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -49,7 +49,7 @@ jobs:
     name: Docker build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker build -t job-sniper-bot:ci .
 
   deploy:
@@ -57,16 +57,57 @@ jobs:
     needs: [test, docker]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || 'dev' }}
     steps:
-      - name: Trigger Dokploy deploy
+      - name: Deploy to Dokploy and wait for the result
+        shell: bash
         env:
           DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
           DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
           APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
         run: |
-          curl --fail-with-body -sS -X POST "${DOKPLOY_URL%/}/api/application.deploy" \
+          base="${DOKPLOY_URL%/}/api"
+
+          api() {
+            curl --fail-with-body -sS -H "x-api-key: ${DOKPLOY_API_KEY}" "$@"
+          }
+
+          latest() {
+            local response
+            response=$(api --retry 3 --retry-delay 2 "${base}/deployment.all?applicationId=${APPLICATION_ID}") || {
+              echo "::error::Could not read deployments from Dokploy: ${response}" >&2
+              return 1
+            }
+            jq -c 'sort_by(.createdAt) | last // {}' <<< "$response"
+          }
+
+          before=$(latest | jq -r '.deploymentId // empty')
+
+          api -X POST "${base}/application.deploy" \
             -H "Content-Type: application/json" \
-            -H "x-api-key: ${DOKPLOY_API_KEY}" \
-            -d "{\"applicationId\": \"${APPLICATION_ID}\"}"
+            -d "{\"applicationId\": \"${APPLICATION_ID}\", \"title\": \"Deploy ${GITHUB_SHA}\"}"
+          echo
+          echo "Deployment requested for ${GITHUB_SHA}"
+
+          deadline=$((SECONDS + 900))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            sleep 10
+            current=$(latest)
+            id=$(jq -r '.deploymentId // empty' <<< "$current")
+            status=$(jq -r '.status // empty' <<< "$current")
+            if [ -n "$id" ] && [ "$id" != "$before" ]; then
+              echo "Deployment ${id}: ${status}"
+              case "$status" in
+                done) exit 0 ;;
+                error | cancelled)
+                  echo "::error::Dokploy deployment ${id} ended with status '${status}'. Check the deployment logs in Dokploy."
+                  exit 1
+                  ;;
+              esac
+            fi
+          done
+
+          echo "::error::Timed out waiting for the Dokploy deployment to finish."
+          exit 1
