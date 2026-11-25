@@ -1,0 +1,371 @@
+[
+  {
+    "name": "Arica",
+    "bucket": "1000",
+    "region": "Arica y Parinacota",
+    "aliases": []
+  },
+  {
+    "name": "Putre",
+    "bucket": "1001",
+    "region": "Arica y Parinacota",
+    "aliases": []
+  },
+  {
+    "name": "Iquique",
+    "bucket": "1002",
+    "region": "Tarapacá",
+    "aliases": []
+  },
+  {
+    "name": "Pozo Almonte",
+    "bucket": "1003",
+    "region": "Tarapacá",
+    "aliases": []
+  },
+  {
+    "name": "Antofagasta",
+    "bucket": "1004",
+    "region": "Antofagasta",
+    "aliases": []
+  },
+  {
+    "name": "Tocopilla",
+    "bucket": "1005",
+    "region": "Antofagasta",
+    "aliases": []
+  },
+  {
+    "name": "Calama",
+    "bucket": "1006",
+    "region": "Antofagasta",
+    "aliases": []
+  },
+  {
+    "name": "Copiapó",
+    "bucket": "1007",
+    "region": "Atacama",
+    "aliases": []
+  },
+  {
+    "name": "Chañaral",
+    "bucket": "1008",
+    "region": "Atacama",
+    "aliases": []
+  },
+  {
+    "name": "Vallenar",
+    "bucket": "1009",
+    "region": "Atacama",
+    "aliases": []
+  },
+  {
+    "name": "La Serena",
+    "bucket": "1010",
+    "region": "Coquimbo",
+    "aliases": []
+  },
+  {
+    "name": "Coquimbo",
+    "bucket": "1011",
+    "region": "Coquimbo",
+    "aliases": []
+  },
+  {
+    "name": "Ovalle",
+    "bucket": "1012",
+    "region": "Coquimbo",
+    "aliases": []
+  },
+  {
+    "name": "Illapel",
+    "bucket": "1013",
+    "region": "Coquimbo",
+    "aliases": []
+  },
+  {
+    "name": "Valparaíso",
+    "bucket": "1014",
+    "region": "Valparaíso",
+    "aliases": [
+      "Viña del Mar",
+      "Villa Alemana",
+      "Concón"
+    ]
+  },
+  {
+    "name": "La Ligua",
+    "bucket": "1015",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "Los Andes",
+    "bucket": "1016",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "San Felipe",
+    "bucket": "1017",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "Quillota",
+    "bucket": "1018",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "San Antonio",
+    "bucket": "1019",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "Hanga Roa",
+    "bucket": "1020",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "Quilpué",
+    "bucket": "1021",
+    "region": "Valparaíso",
+    "aliases": []
+  },
+  {
+    "name": "Santiago",
+    "bucket": "1022",
+    "region": "Metropolitana",
+    "aliases": [
+      "Santiago de Chile",
+      "Providencia",
+      "Las Condes",
+      "Ñuñoa",
+      "Vitacura",
+      "La Reina",
+      "Peñalolén",
+      "Maipú",
+      "La Florida",
+      "Lo Barnechea",
+      "Macul",
+      "San Miguel",
+      "Independencia",
+      "Estación Central",
+      "Quinta Normal",
+      "Recoleta"
+    ]
+  },
+  {
+    "name": "Colina",
+    "bucket": "1023",
+    "region": "Metropolitana",
+    "aliases": []
+  },
+  {
+    "name": "Puente Alto",
+    "bucket": "1024",
+    "region": "Metropolitana",
+    "aliases": []
+  },
+  {
+    "name": "San Bernardo",
+    "bucket": "1025",
+    "region": "Metropolitana",
+    "aliases": []
+  },
+  {
+    "name": "Melipilla",
+    "bucket": "1026",
+    "region": "Metropolitana",
+    "aliases": []
+  },
+  {
+    "name": "Talagante",
+    "bucket": "1027",
+    "region": "Metropolitana",
+    "aliases": []
+  },
+  {
+    "name": "Rancagua",
+    "bucket": "1028",
+    "region": "O'Higgins",
+    "aliases": []
+  },
+  {
+    "name": "San Fernando",
+    "bucket": "1029",
+    "region": "O'Higgins",
+    "aliases": []
+  },
+  {
+    "name": "Pichilemu",
+    "bucket": "1030",
+    "region": "O'Higgins",
+    "aliases": []
+  },
+  {
+    "name": "Talca",
+    "bucket": "1031",
+    "region": "Maule",
+    "aliases": []
+  },
+  {
+    "name": "Curicó",
+    "bucket": "1032",
+    "region": "Maule",
+    "aliases": []
+  },
+  {
+    "name": "Linares",
+    "bucket": "1033",
+    "region": "Maule",
+    "aliases": []
+  },
+  {
+    "name": "Cauquenes",
+    "bucket": "1034",
+    "region": "Maule",
+    "aliases": []
+  },
+  {
+    "name": "Concepción",
+    "bucket": "1035",
+    "region": "Biobío",
+    "aliases": []
+  },
+  {
+    "name": "Quirihue",
+    "bucket": "1055",
+    "region": "Ñuble",
+    "aliases": []
+  },
+  {
+    "name": "Bulnes",
+    "bucket": "1056",
+    "region": "Ñuble",
+    "aliases": []
+  },
+  {
+    "name": "San Carlos",
+    "bucket": "1057",
+    "region": "Ñuble",
+    "aliases": []
+  },
+  {
+    "name": "Chillán",
+    "bucket": "1036",
+    "region": "Ñuble",
+    "aliases": []
+  },
+  {
+    "name": "Los Ángeles",
+    "bucket": "1037",
+    "region": "Biobío",
+    "aliases": []
+  },
+  {
+    "name": "Lebu",
+    "bucket": "1038",
+    "region": "Biobío",
+    "aliases": []
+  },
+  {
+    "name": "Temuco",
+    "bucket": "1039",
+    "region": "Araucanía",
+    "aliases": []
+  },
+  {
+    "name": "Angol",
+    "bucket": "1040",
+    "region": "Araucanía",
+    "aliases": []
+  },
+  {
+    "name": "Valdivia",
+    "bucket": "1041",
+    "region": "Los Ríos",
+    "aliases": []
+  },
+  {
+    "name": "La Unión",
+    "bucket": "1042",
+    "region": "Los Ríos",
+    "aliases": []
+  },
+  {
+    "name": "Puerto Montt",
+    "bucket": "1043",
+    "region": "Los Lagos",
+    "aliases": []
+  },
+  {
+    "name": "Osorno",
+    "bucket": "1044",
+    "region": "Los Lagos",
+    "aliases": []
+  },
+  {
+    "name": "Castro",
+    "bucket": "1045",
+    "region": "Los Lagos",
+    "aliases": []
+  },
+  {
+    "name": "Chaitén",
+    "bucket": "1046",
+    "region": "Los Lagos",
+    "aliases": []
+  },
+  {
+    "name": "Coyhaique",
+    "bucket": "1047",
+    "region": "Aysén",
+    "aliases": []
+  },
+  {
+    "name": "Puerto Aysén",
+    "bucket": "1048",
+    "region": "Aysén",
+    "aliases": []
+  },
+  {
+    "name": "Chile Chico",
+    "bucket": "1049",
+    "region": "Aysén",
+    "aliases": []
+  },
+  {
+    "name": "Cochrane",
+    "bucket": "1050",
+    "region": "Aysén",
+    "aliases": []
+  },
+  {
+    "name": "Punta Arenas",
+    "bucket": "1051",
+    "region": "Magallanes",
+    "aliases": []
+  },
+  {
+    "name": "Puerto Natales",
+    "bucket": "1052",
+    "region": "Magallanes",
+    "aliases": []
+  },
+  {
+    "name": "Porvenir",
+    "bucket": "1053",
+    "region": "Magallanes",
+    "aliases": []
+  },
+  {
+    "name": "Puerto Williams",
+    "bucket": "1054",
+    "region": "Magallanes",
+    "aliases": []
+  }
+]
