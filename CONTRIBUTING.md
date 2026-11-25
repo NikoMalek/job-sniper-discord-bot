@@ -40,7 +40,7 @@ Cuando termines:
 
 ```powershell
 git add .
-git commit -m "Describe el cambio"
+git commit -m "feat: describe el cambio"
 git push -u origin feature/nombre-del-cambio
 ```
 
@@ -58,10 +58,12 @@ encarga de llevarlas también a `develop`.
 
 ## Aportes frecuentes
 
-**Ubicaciones (países, ciudades, alias).** Se editan en JSON, sin tocar Python:
-`src/data/countries.json`, `chiletrabajos_cities.json`,
-`computrabajo_locations.json` y `firstjob_locations.json`. El README explica
-la estructura de cada uno.
+**Ubicaciones y alias (JSON, sin tocar Python).** Se editan en `src/data/`:
+- `countries.json`, `chiletrabajos_cities.json`, `computrabajo_locations.json` y `firstjob_locations.json`: países/ciudades/alias de ubicaciones.
+- `keyword_aliases.json`: alias de palabras clave usadas al buscar coincidencias en ofertas.
+- `blacklist_keyword_alias_groups.json`: grupos de alias comunes para `/add-blacklist-keyword` con la opción `incluir_alias`.
+
+El README explica el uso de ubicaciones y filtros; al editar estos JSON, reinicia el bot para validar el formato.
 
 **Un portal nuevo.** Toma uno de los scrapers de `src/scrapers/` como
 plantilla. Además:
@@ -79,6 +81,10 @@ plantilla. Además:
 
 - Nunca subas secretos: `.env`, tokens de Discord ni el token del proxy.
 - Los textos que ve el usuario del bot van en español.
+- Usa **Conventional Commits** en los mensajes de commit. Ejemplos simples:
+  - `feat: add blacklist keyword alias option`
+  - `fix: handle empty blacklist keyword input`
+  - `docs: clarify blacklist keyword command usage`
 - Prefiere Pull Requests pequeños y enfocados, con una descripción de qué
   cambia y cómo lo probaste.
 
