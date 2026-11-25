@@ -32,6 +32,26 @@ async def test_blacklisted_companies_and_languages(db):
     assert config.languages == ["english"]
 
 
+async def test_blacklisted_keywords_case_insensitive_and_monitor_configs(db):
+    await db.set_channel(GUILD, 100)
+    await db.add_keyword(GUILD, "python")
+    assert await db.add_blacklisted_keyword(GUILD, "Práctica") is True
+    assert await db.add_blacklisted_keyword(GUILD, "práctica") is False
+    assert await db.add_blacklisted_keyword(GUILD, "docente") is True
+    assert await db.add_blacklisted_keyword(OTHER_GUILD, "docente") is True
+
+    config = await db.get_guild_config(GUILD)
+    assert config.blacklisted_keywords == ["Práctica", "docente"]
+
+    monitor_configs = await db.get_monitor_configs()
+    assert len(monitor_configs) == 1
+    assert monitor_configs[0].blacklisted_keywords == ["Práctica", "docente"]
+
+    assert await db.remove_blacklisted_keyword(GUILD, "PRÁCTICA") is True
+    assert await db.remove_blacklisted_keyword(GUILD, "PRÁCTICA") is False
+    assert (await db.get_guild_config(GUILD)).blacklisted_keywords == ["docente"]
+
+
 async def test_default_portal_and_add_remove(db):
     await db.add_keyword(GUILD, "python")  # create guild config
     assert await db.get_portals(GUILD) == ["linkedin"]

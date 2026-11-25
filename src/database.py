@@ -26,6 +26,13 @@ class GuildMonitorConfig:
     languages: list[str]
     max_age_hours: float
     portals: tuple[str, ...]
+    blacklisted_keywords: list[str] = ()  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.blacklisted_keywords, tuple):
+            object.__setattr__(
+                self, "blacklisted_keywords", list(self.blacklisted_keywords)
+            )
 
     @property
     def location(self) -> str:
@@ -143,6 +150,15 @@ class Database:
                     guild_id INTEGER NOT NULL,
                     company TEXT NOT NULL,
                     UNIQUE (guild_id, company),
+                    FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE TABLE IF NOT EXISTS guild_blacklisted_keywords (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    guild_id INTEGER NOT NULL,
+                    keyword TEXT NOT NULL,
+                    UNIQUE (guild_id, keyword),
                     FOREIGN KEY (guild_id) REFERENCES guild_configs(guild_id)
                         ON DELETE CASCADE
                 );
@@ -567,6 +583,45 @@ class Database:
             await connection.commit()
             return cursor.rowcount == 1
 
+    async def add_blacklisted_keyword(self, guild_id: int, keyword: str) -> bool:
+        await self._ensure_guild(guild_id)
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT keyword FROM guild_blacklisted_keywords WHERE guild_id = ?",
+                (guild_id,),
+            )
+            if any(row[0].casefold() == keyword.casefold() for row in await cursor.fetchall()):
+                return False
+            await connection.execute(
+                """
+                INSERT INTO guild_blacklisted_keywords (guild_id, keyword)
+                VALUES (?, ?)
+                """,
+                (guild_id, keyword),
+            )
+            await connection.commit()
+        return True
+
+    async def remove_blacklisted_keyword(self, guild_id: int, keyword: str) -> bool:
+        async with aiosqlite.connect(self.path) as connection:
+            cursor = await connection.execute(
+                "SELECT id, keyword FROM guild_blacklisted_keywords WHERE guild_id = ?",
+                (guild_id,),
+            )
+            matching_ids = [
+                row[0]
+                for row in await cursor.fetchall()
+                if row[1].casefold() == keyword.casefold()
+            ]
+            if not matching_ids:
+                return False
+            await connection.executemany(
+                "DELETE FROM guild_blacklisted_keywords WHERE id = ?",
+                [(row_id,) for row_id in matching_ids],
+            )
+            await connection.commit()
+            return True
+
     async def add_language(self, guild_id: int, language: str) -> bool:
         await self._ensure_guild(guild_id)
         async with aiosqlite.connect(self.path) as connection:
@@ -644,6 +699,16 @@ class Database:
             blacklisted_companies = [
                 row["company"] for row in await blacklist_cursor.fetchall()
             ]
+            blacklisted_keyword_cursor = await connection.execute(
+                """
+                SELECT keyword FROM guild_blacklisted_keywords
+                WHERE guild_id = ? ORDER BY keyword
+                """,
+                (guild_id,),
+            )
+            blacklisted_keywords = [
+                row["keyword"] for row in await blacklisted_keyword_cursor.fetchall()
+            ]
             language_cursor = await connection.execute(
                 "SELECT language FROM guild_languages WHERE guild_id = ? ORDER BY language",
                 (guild_id,),
@@ -673,6 +738,7 @@ class Database:
             languages=languages,
             max_age_hours=float(config["max_age_hours"]),
             portals=portals,
+            blacklisted_keywords=blacklisted_keywords,
         )
 
     async def get_monitor_configs(self) -> list[GuildMonitorConfig]:
@@ -703,6 +769,17 @@ class Database:
                 )
                 blacklisted_companies = [
                     row["company"] for row in await blacklist_cursor.fetchall()
+                ]
+                blacklisted_keyword_cursor = await connection.execute(
+                    """
+                    SELECT keyword FROM guild_blacklisted_keywords
+                    WHERE guild_id = ? ORDER BY keyword
+                    """,
+                    (config["guild_id"],),
+                )
+                blacklisted_keywords = [
+                    row["keyword"]
+                    for row in await blacklisted_keyword_cursor.fetchall()
                 ]
                 language_cursor = await connection.execute(
                     "SELECT language FROM guild_languages WHERE guild_id = ? ORDER BY language",
@@ -735,6 +812,7 @@ class Database:
                             languages=languages,
                             max_age_hours=float(config["max_age_hours"]),
                             portals=portals,
+                            blacklisted_keywords=blacklisted_keywords,
                         )
                     )
         return result
