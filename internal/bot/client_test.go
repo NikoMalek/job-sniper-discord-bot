@@ -114,6 +114,52 @@ func TestOnReadyClosesReadyChannelOnce(t *testing.T) {
 	}
 }
 
+func TestOnReadySkipsUnavailableGuildsForOnboarding(t *testing.T) {
+	client, st, _, _, _ := newTestClient(t)
+	client.onReady(&discordgo.Session{}, &discordgo.Ready{
+		Guilds: []*discordgo.Guild{{ID: "10", Unavailable: true}},
+	})
+	if st.setupChecks != 0 {
+		t.Fatalf("setup checks = %d, want 0 for unavailable guild", st.setupChecks)
+	}
+}
+
+func TestOnReadyChecksAvailableGuildsForOnboarding(t *testing.T) {
+	client, st, _, _, _ := newTestClient(t)
+	client.onReady(&discordgo.Session{}, &discordgo.Ready{
+		Guilds: []*discordgo.Guild{{ID: "10", Unavailable: false, OwnerID: "99"}},
+	})
+	if st.setupChecks != 1 {
+		t.Fatalf("setup checks = %d, want 1 for available guild", st.setupChecks)
+	}
+}
+
+func TestOnGuildJoinDeliversAfterReadySkippedUnavailableGuild(t *testing.T) {
+	client, st, _, _, _ := newTestClient(t)
+	client.onReady(&discordgo.Session{}, &discordgo.Ready{
+		Guilds: []*discordgo.Guild{{ID: "10", Unavailable: true}},
+	})
+	gateway := client.onboarding.gateway.(*fakeOnboardingGateway)
+	gateway.channels = map[int64]ChannelInfo{
+		20: {ID: 20, GuildID: 10, CanSend: true, CanEmbed: true},
+	}
+	gateway.users = map[int64]UserInfo{99: {ID: 99, Available: true}}
+	client.onboarding.OnGuildJoin(context.Background(), GuildSnapshot{
+		ID:      10,
+		OwnerID: 99,
+		TextChannels: []ChannelInfo{
+			{ID: 20, GuildID: 10, CanSend: true, CanEmbed: true},
+		},
+	})
+	channels, _, _ := gateway.snapshot()
+	if want := []int64{20}; !reflect.DeepEqual(channels, want) {
+		t.Fatalf("sent channels = %v, want %v", channels, want)
+	}
+	if st.markCount != 1 {
+		t.Fatalf("markCount = %d, want 1", st.markCount)
+	}
+}
+
 func TestRegisterCommandsUsesResolvedAppIDAndGlobalScope(t *testing.T) {
 	client, _, registrar, resolver, _ := newTestClient(t)
 	if err := client.RegisterCommands(context.Background()); err != nil {

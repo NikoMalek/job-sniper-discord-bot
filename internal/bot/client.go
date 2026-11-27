@@ -231,6 +231,10 @@ func (c *Client) baseContext() context.Context {
 	return c.ctx
 }
 
+func isOnboardingGuild(guild *discordgo.Guild) bool {
+	return guild != nil && !guild.Unavailable
+}
+
 func (c *Client) onReady(session *discordgo.Session, ready *discordgo.Ready) {
 	c.readyOnce.Do(func() { close(c.readyChannel()) })
 	if session.State != nil && session.State.User != nil {
@@ -239,11 +243,17 @@ func (c *Client) onReady(session *discordgo.Session, ready *discordgo.Ready) {
 	guilds := make([]GuildSnapshot, 0)
 	if session.State != nil {
 		for _, guild := range session.State.Guilds {
+			if !isOnboardingGuild(guild) {
+				continue
+			}
 			guilds = append(guilds, c.guildSnapshot(c.baseContext(), guild))
 		}
 	}
 	if len(guilds) == 0 && ready != nil {
 		for _, guild := range ready.Guilds {
+			if !isOnboardingGuild(guild) {
+				continue
+			}
 			guilds = append(guilds, c.guildSnapshot(c.baseContext(), guild))
 		}
 	}
