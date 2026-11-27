@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // NotifiedKey identifies one already-notified job variant inside a guild.
@@ -78,7 +79,7 @@ func (s *Store) CleanupNotifiedJobs(ctx context.Context, hours ...float64) (int6
 	if len(hours) == 1 {
 		window = hours[0]
 	}
-	modifier := "-" + strconv.FormatFloat(window, 'g', -1, 64) + " hours"
+	modifier := "-" + strconv.FormatFloat(window, 'g', 6, 64) + " hours"
 	result, err := s.db.ExecContext(ctx,
 		"DELETE FROM notified_jobs WHERE created_at < datetime('now', ?)", modifier)
 	if err != nil {
@@ -87,6 +88,39 @@ func (s *Store) CleanupNotifiedJobs(ctx context.Context, hours ...float64) (int6
 	count, err := result.RowsAffected()
 	if err != nil {
 		return 0, fmt.Errorf("read cleaned notified count: %w", err)
+	}
+	return count, nil
+}
+
+// CleanupTrackedJobs deletes tracking tokens older than hours using the
+// current UTC time. The default window matches Python's retention setting.
+func (s *Store) CleanupTrackedJobs(ctx context.Context, hours ...float64) (int64, error) {
+	return s.CleanupTrackedJobsAt(ctx, time.Now().UTC(), hours...)
+}
+
+// CleanupTrackedJobsAt deletes tracking tokens older than hours relative to
+// now. It mirrors Python's ISO-8601 cutoff with second precision and is used
+// by tests that need a deterministic clock.
+func (s *Store) CleanupTrackedJobsAt(
+	ctx context.Context, now time.Time, hours ...float64,
+) (int64, error) {
+	if len(hours) > 1 {
+		return 0, fmt.Errorf("cleanup tracked jobs: expected at most one hours argument")
+	}
+	window := NotifiedRetentionHours
+	if len(hours) == 1 {
+		window = hours[0]
+	}
+	cutoff := now.Add(-time.Duration(window * float64(time.Hour))).UTC()
+	stamp := cutoff.Format("2006-01-02T15:04:05-07:00")
+	result, err := s.db.ExecContext(ctx,
+		"DELETE FROM tracked_jobs WHERE created_at < ?", stamp)
+	if err != nil {
+		return 0, fmt.Errorf("cleanup tracked jobs: %w", err)
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read cleaned tracked count: %w", err)
 	}
 	return count, nil
 }
