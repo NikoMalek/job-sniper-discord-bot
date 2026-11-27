@@ -196,9 +196,15 @@ func DefaultRegistry() *Registry {
 			ProxyMode:  ChileTrabajosProxyMode,
 			ProxyHosts: []string{ChileTrabajosProxyHost},
 		})
+		computrabajoClient := httpclient.NewClient(httpclient.Options{
+			Source:     ComputrabajoSource,
+			ProxyMode:  ComputrabajoProxyMode,
+			ProxyHosts: ComputrabajoProxyHosts(),
+		})
 		defaultRegistry = NewRegistry(
 			NewGetOnBoardScraper(GetOnBoardOptions{Fetcher: boardClient}),
 			NewChileTrabajosScraper(ChileTrabajosOptions{Fetcher: chileClient}),
+			NewComputrabajoScraper(ComputrabajoOptions{Fetcher: computrabajoClient}),
 		)
 	})
 	return defaultRegistry
