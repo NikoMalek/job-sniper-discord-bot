@@ -98,7 +98,11 @@ func TestRegistryAndPortalNames(t *testing.T) {
 	if got := DefaultRegistry().Get(GetOnBoardSlug); got == nil {
 		t.Fatal("default registry must contain the Get on Board singleton")
 	}
-	if got := PortalNames([]string{GetOnBoardSlug}); len(got) != 1 || got[0] != GetOnBoardSource {
+	if got := DefaultRegistry().Get(ChileTrabajosSlug); got == nil || got.Source() != ChileTrabajosSource {
+		t.Fatalf("default registry must contain the ChileTrabajos singleton: %v", got)
+	}
+	if got := PortalNames([]string{GetOnBoardSlug, ChileTrabajosSlug}); len(got) != 2 ||
+		got[0] != GetOnBoardSource || got[1] != ChileTrabajosSource {
 		t.Fatalf("unexpected portal names: %v", got)
 	}
 }

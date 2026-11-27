@@ -186,13 +186,19 @@ var (
 // so their in-memory caches persist between cycles and guilds.
 func DefaultRegistry() *Registry {
 	defaultRegistryOnce.Do(func() {
-		client := httpclient.NewClient(httpclient.Options{
+		boardClient := httpclient.NewClient(httpclient.Options{
 			Source:     GetOnBoardSource,
 			ProxyMode:  GetOnBoardProxyMode,
 			ProxyHosts: []string{GetOnBoardProxyHost},
 		})
+		chileClient := httpclient.NewClient(httpclient.Options{
+			Source:     ChileTrabajosSource,
+			ProxyMode:  ChileTrabajosProxyMode,
+			ProxyHosts: []string{ChileTrabajosProxyHost},
+		})
 		defaultRegistry = NewRegistry(
-			NewGetOnBoardScraper(GetOnBoardOptions{Fetcher: client}),
+			NewGetOnBoardScraper(GetOnBoardOptions{Fetcher: boardClient}),
+			NewChileTrabajosScraper(ChileTrabajosOptions{Fetcher: chileClient}),
 		)
 	})
 	return defaultRegistry
