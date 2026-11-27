@@ -206,11 +206,17 @@ func DefaultRegistry() *Registry {
 			ProxyMode:  FirstJobProxyMode,
 			ProxyHosts: FirstJobProxyHosts(),
 		})
+		linkedInClient := httpclient.NewClient(httpclient.Options{
+			Source:     LinkedInSource,
+			ProxyMode:  LinkedInProxyMode,
+			ProxyHosts: LinkedInProxyHosts(),
+		})
 		defaultRegistry = NewRegistry(
 			NewGetOnBoardScraper(GetOnBoardOptions{Fetcher: boardClient}),
 			NewChileTrabajosScraper(ChileTrabajosOptions{Fetcher: chileClient}),
 			NewComputrabajoScraper(ComputrabajoOptions{Fetcher: computrabajoClient}),
 			NewFirstJobScraper(FirstJobOptions{Fetcher: firstJobClient}),
+			NewLinkedInScraper(LinkedInOptions{Fetcher: linkedInClient}),
 		)
 	})
 	return defaultRegistry
