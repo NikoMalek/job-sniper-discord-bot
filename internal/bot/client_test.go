@@ -156,7 +156,15 @@ func TestRegisterCommandsPropagatesErrors(t *testing.T) {
 	}
 }
 
-func TestOnInteractionCreateRejectsMissingPermissions(t *testing.T) {
+func TestInteractionHandlerSignatureMatchesDiscordGo(t *testing.T) {
+	client, _, _, _, _ := newTestClient(t)
+	var handler func(*discordgo.Session, *discordgo.InteractionCreate) = client.onInteractionCreate
+	if handler == nil {
+		t.Fatal("interaction handler is nil")
+	}
+}
+
+func TestOnInteractionCreateDefersPermissionsToDiscord(t *testing.T) {
 	client, _, _, _, sender := newTestClient(t)
 	interaction := &discordgo.Interaction{
 		ID:             "i-1",
@@ -165,7 +173,7 @@ func TestOnInteractionCreateRejectsMissingPermissions(t *testing.T) {
 		AppPermissions: 0,
 		Data:           discordgo.ApplicationCommandInteractionData{Name: "help"},
 	}
-	client.onInteractionCreate(nil, interaction)
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: interaction})
 	responses, followups := sender.snapshot()
 	if len(responses) != 1 || len(followups) != 0 {
 		t.Fatalf("responses = %#v, followups = %#v", responses, followups)
@@ -174,8 +182,8 @@ func TestOnInteractionCreateRejectsMissingPermissions(t *testing.T) {
 	if response.Type != discordgo.InteractionResponseChannelMessageWithSource {
 		t.Fatalf("response type = %v", response.Type)
 	}
-	if response.Data.Content != "No tienes permiso para usar este comando." {
-		t.Fatalf("content = %q", response.Data.Content)
+	if len(response.Data.Embeds) != 1 || response.Data.Embeds[0].Title != "Ayuda de Job Sniper" {
+		t.Fatalf("embeds = %#v", response.Data.Embeds)
 	}
 	if response.Data.Flags != discordgo.MessageFlagsEphemeral {
 		t.Fatalf("flags = %v, want ephemeral", response.Data.Flags)
@@ -190,7 +198,7 @@ func TestOnInteractionCreateRejectsDMs(t *testing.T) {
 		AppPermissions: int64(discordgo.PermissionManageGuild),
 		Data:           discordgo.ApplicationCommandInteractionData{Name: "help"},
 	}
-	client.onInteractionCreate(nil, interaction)
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: interaction})
 	responses, _ := sender.snapshot()
 	if len(responses) != 1 || responses[0].Data.Content != "No tienes permiso para usar este comando." {
 		t.Fatalf("responses = %#v", responses)
@@ -203,7 +211,7 @@ func TestOnInteractionCreateDispatchesCommand(t *testing.T) {
 		ID:             "i-3",
 		Type:           discordgo.InteractionApplicationCommand,
 		GuildID:        "10",
-		AppPermissions: int64(discordgo.PermissionManageGuild),
+		AppPermissions: 0,
 		Data: discordgo.ApplicationCommandInteractionData{
 			Name: "add-keyword",
 			Options: []*discordgo.ApplicationCommandInteractionDataOption{
@@ -211,7 +219,7 @@ func TestOnInteractionCreateDispatchesCommand(t *testing.T) {
 			},
 		},
 	}
-	client.onInteractionCreate(nil, interaction)
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: interaction})
 	responses, _ := sender.snapshot()
 	if len(responses) != 1 {
 		t.Fatalf("responses = %#v", responses)
@@ -238,7 +246,7 @@ func TestOnInteractionCreateAnswersAutocomplete(t *testing.T) {
 			},
 		},
 	}
-	client.onInteractionCreate(nil, interaction)
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: interaction})
 	responses, _ := sender.snapshot()
 	if len(responses) != 1 {
 		t.Fatalf("responses = %#v", responses)
@@ -283,26 +291,6 @@ func TestNewSessionUsesOnlyGuildsIntent(t *testing.T) {
 	}
 	if _, err := newSession(""); err == nil {
 		t.Fatal("newSession(empty) error = nil, want error")
-	}
-}
-
-func TestHasManageGuild(t *testing.T) {
-	tests := []struct {
-		name        string
-		permissions int64
-		want        bool
-	}{
-		{name: "manage guild", permissions: int64(discordgo.PermissionManageGuild), want: true},
-		{name: "administrator", permissions: int64(discordgo.PermissionAdministrator), want: true},
-		{name: "send messages", permissions: int64(discordgo.PermissionSendMessages), want: false},
-		{name: "none", permissions: 0, want: false},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := hasManageGuild(test.permissions); got != test.want {
-				t.Fatalf("hasManageGuild(%d) = %v, want %v", test.permissions, got, test.want)
-			}
-		})
 	}
 }
 

@@ -322,12 +322,11 @@ func (c *Client) currentUserID() string {
 	return user.ID
 }
 
-func hasManageGuild(permissions int64) bool {
-	return permissions&discordgo.PermissionAdministrator != 0 ||
-		permissions&discordgo.PermissionManageGuild != 0
-}
-
-func (c *Client) onInteractionCreate(_ *discordgo.Session, interaction *discordgo.Interaction) {
+func (c *Client) onInteractionCreate(_ *discordgo.Session, event *discordgo.InteractionCreate) {
+	if event == nil || event.Interaction == nil {
+		return
+	}
+	interaction := event.Interaction
 	ctx := c.baseContext()
 	if interaction.Type == discordgo.InteractionApplicationCommandAutocomplete {
 		c.handleAutocomplete(ctx, interaction)
@@ -336,7 +335,7 @@ func (c *Client) onInteractionCreate(_ *discordgo.Session, interaction *discordg
 	if interaction.Type != discordgo.InteractionApplicationCommand {
 		return
 	}
-	if parseSnowflake(interaction.GuildID) == 0 || !hasManageGuild(interaction.AppPermissions) {
+	if parseSnowflake(interaction.GuildID) == 0 {
 		c.respond(ctx, interaction, c.admin.ErrorResponse(ErrPermissionDenied))
 		return
 	}
