@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/NikoMalek/job-sniper-discord-bot/internal/job"
 	"github.com/NikoMalek/job-sniper-discord-bot/internal/scrapers"
@@ -67,6 +68,29 @@ func TestRunStopsWhileWaitingForReady(t *testing.T) {
 	cancel()
 	if err := monitor.Run(ctx); err != nil {
 		t.Fatalf("Run() error = %v, want nil on cancellation", err)
+	}
+}
+
+func TestWaitReturnsAfterCanceledTasksFinish(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	monitor, deps := setupMonitor(t, func(_ *Options, deps *testDeps) {
+		portal := newFakePortal("linkedin", "LinkedIn")
+		portal.blockUntilCancel = true
+		portal.jobs["Worldwide"] = []job.Job{
+			jobRecord("job-1", "LinkedIn", "Python engineer", "Acme"),
+		}
+		deps.portals.portals = []Portal{portal}
+		deps.store.configs = []store.GuildMonitorConfig{channelConfig(1, 10)}
+	})
+	monitor.RunOnce(ctx)
+	portal := deps.portals.Get("linkedin").(*fakePortal)
+	waitFor(t, "blocked fetch", func() bool { return len(portal.fetchCalls()) == 1 })
+
+	cancel()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := monitor.Wait(waitCtx); err != nil {
+		t.Fatalf("Wait() error = %v", err)
 	}
 }
 

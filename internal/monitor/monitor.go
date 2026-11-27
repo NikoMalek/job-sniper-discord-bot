@@ -325,6 +325,31 @@ func (m *Monitor) RunOnce(ctx context.Context) {
 	))
 }
 
+// Wait blocks until all background portal and flush tasks have exited.
+func (m *Monitor) Wait(ctx context.Context) error {
+	for {
+		m.mu.Lock()
+		states := make([]*taskState, 0, len(m.portalTasks)+len(m.flushTasks))
+		for _, state := range m.portalTasks {
+			states = append(states, state)
+		}
+		for _, state := range m.flushTasks {
+			states = append(states, state)
+		}
+		m.mu.Unlock()
+		if len(states) == 0 {
+			return nil
+		}
+		for _, state := range states {
+			select {
+			case <-state.done:
+			case <-ctx.Done():
+				return fmt.Errorf("wait for monitor tasks: %w", ctx.Err())
+			}
+		}
+	}
+}
+
 func (m *Monitor) setRoot(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -98,6 +98,22 @@ func newTestClient(t *testing.T) (*Client, *fakeStore, *fakeRegistrar, *fakeReso
 	return client, st, registrar, resolver, sender
 }
 
+func TestOnReadyClosesReadyChannelOnce(t *testing.T) {
+	client, _, _, _, _ := newTestClient(t)
+	client.onReady(&discordgo.Session{}, &discordgo.Ready{})
+	select {
+	case <-client.Ready():
+	default:
+		t.Fatal("Ready() channel was not closed by onReady")
+	}
+	client.onReady(&discordgo.Session{}, &discordgo.Ready{})
+	select {
+	case <-client.Ready():
+	default:
+		t.Fatal("Ready() channel changed after the second ready event")
+	}
+}
+
 func TestRegisterCommandsUsesResolvedAppIDAndGlobalScope(t *testing.T) {
 	client, _, registrar, resolver, _ := newTestClient(t)
 	if err := client.RegisterCommands(context.Background()); err != nil {

@@ -65,6 +65,8 @@ type Client struct {
 	responded map[string]bool
 	closeOnce sync.Once
 	closeErr  error
+	readyOnce sync.Once
+	ready     chan struct{}
 }
 
 // NewClient builds a client and registers its event handlers.
@@ -131,6 +133,7 @@ func NewClient(options ClientOptions) (*Client, error) {
 		sender:        sender,
 		ctx:           context.Background(),
 		responded:     make(map[string]bool),
+		ready:         make(chan struct{}),
 	}
 	session.AddHandler(client.onReady)
 	session.AddHandler(client.onGuildCreate)
@@ -156,6 +159,20 @@ func newSession(token string) (*discordgo.Session, error) {
 
 // Session exposes the underlying discordgo session for shutdown and wiring.
 func (c *Client) Session() *discordgo.Session { return c.session }
+
+// Ready returns a channel that closes after the first READY event.
+func (c *Client) Ready() <-chan struct{} {
+	return c.readyChannel()
+}
+
+func (c *Client) readyChannel() chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ready == nil {
+		c.ready = make(chan struct{})
+	}
+	return c.ready
+}
 
 // Run registers global commands, opens the gateway and waits for cancellation.
 func (c *Client) Run(ctx context.Context) error {
@@ -215,6 +232,7 @@ func (c *Client) baseContext() context.Context {
 }
 
 func (c *Client) onReady(session *discordgo.Session, ready *discordgo.Ready) {
+	c.readyOnce.Do(func() { close(c.readyChannel()) })
 	if session.State != nil && session.State.User != nil {
 		slog.Info(fmt.Sprintf("Connected as %s (%s)", session.State.User.String(), session.State.User.ID))
 	}
