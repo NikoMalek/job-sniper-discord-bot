@@ -364,19 +364,21 @@ type fakeJobSender struct {
 	block   <-chan struct{}
 
 	mu          sync.Mutex
+	guildIDs    []int64
 	channels    []string
 	groups      [][]job.Job
 	inFlight    int
 	maxInFlight int
 }
 
-func (s *fakeJobSender) SendJobs(
-	ctx context.Context, channelID string, jobs []job.Job,
+func (s *fakeJobSender) SendJobsForGuild(
+	ctx context.Context, guildID int64, channelID string, jobs []job.Job,
 ) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
 	s.mu.Lock()
+	s.guildIDs = append(s.guildIDs, guildID)
 	s.channels = append(s.channels, channelID)
 	s.groups = append(s.groups, append([]job.Job(nil), jobs...))
 	s.inFlight++

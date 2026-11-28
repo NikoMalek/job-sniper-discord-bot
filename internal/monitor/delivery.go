@@ -210,7 +210,7 @@ func (m *Monitor) deliver(
 		}
 
 		channelID := strconv.FormatInt(*config.ChannelID, 10)
-		sent, err := m.sender.SendJobs(ctx, channelID, fresh)
+		sent, err := m.sender.SendJobsForGuild(ctx, config.GuildID, channelID, fresh)
 		if err != nil {
 			return fmt.Errorf("send jobs: %w", err)
 		}

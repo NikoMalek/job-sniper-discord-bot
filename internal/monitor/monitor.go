@@ -77,9 +77,9 @@ type ChannelResolver interface {
 	ResolveChannel(ctx context.Context, channelID int64) (bool, error)
 }
 
-// JobSender delivers a prepared job group to a channel.
+// JobSender delivers a prepared job group to a channel in one guild.
 type JobSender interface {
-	SendJobs(ctx context.Context, channelID string, jobs []job.Job) (bool, error)
+	SendJobsForGuild(ctx context.Context, guildID int64, channelID string, jobs []job.Job) (bool, error)
 }
 
 // Sleeper injects waits so cycles and delivery can be tested without real time.

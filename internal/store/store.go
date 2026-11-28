@@ -3,11 +3,14 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -46,7 +49,9 @@ func (c GuildMonitorConfig) Location() string {
 
 // Store is a context-aware repository backed by SQLite.
 type Store struct {
-	db *sql.DB
+	db     *sql.DB
+	tokens func() (string, error)
+	now    func() time.Time
 }
 
 // Open initializes the database at path and returns a ready store.
@@ -69,7 +74,17 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	store := &Store{db: db}
+	store := &Store{
+		db: db,
+		tokens: func() (string, error) {
+			buffer := make([]byte, 8)
+			if _, err := rand.Read(buffer); err != nil {
+				return "", fmt.Errorf("generate tracking token: %w", err)
+			}
+			return hex.EncodeToString(buffer), nil
+		},
+		now: func() time.Time { return time.Now().UTC() },
+	}
 	if err := store.Initialize(ctx); err != nil {
 		db.Close()
 		return nil, err

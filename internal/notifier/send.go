@@ -49,16 +49,20 @@ func (s *DiscordMessageSender) SendMessage(
 // SenderOptions holds the deterministic dependencies of notification
 // delivery. Logos default to the HTTP downloader and now defaults to UTC.
 type SenderOptions struct {
-	Messages MessageSender
-	Logos    LogoFetcher
-	Now      func() time.Time
+	Messages     MessageSender
+	Logos        LogoFetcher
+	Now          func() time.Time
+	Tracking     TrackingStore
+	Experimental *bool
 }
 
 // Sender delivers job embeds with a single Forbidden retry for attached logos.
 type Sender struct {
-	messages MessageSender
-	logos    LogoFetcher
-	now      func() time.Time
+	messages     MessageSender
+	logos        LogoFetcher
+	now          func() time.Time
+	tracking     TrackingStore
+	experimental *bool
 }
 
 // NewSender builds a notification sender.
@@ -72,16 +76,25 @@ func NewSender(options SenderOptions) *Sender {
 		now = func() time.Time { return time.Now().UTC() }
 	}
 	return &Sender{
-		messages: options.Messages,
-		logos:    logos,
-		now:      now,
+		messages:     options.Messages,
+		logos:        logos,
+		now:          now,
+		tracking:     options.Tracking,
+		experimental: options.Experimental,
 	}
 }
 
-// SendJobs delivers one embed for a group of jobs. It reports whether Discord
-// accepted the message. Discord refusals are logged rather than returned.
+// SendJobs delivers one non-experimental embed for a group of jobs.
 func (s *Sender) SendJobs(
 	ctx context.Context, channelID string, jobs []job.Job,
+) (bool, error) {
+	return s.SendJobsForGuild(ctx, 0, channelID, jobs)
+}
+
+// SendJobsForGuild delivers one group of jobs to a guild's channel. Experimental
+// guilds get a clean embed with a stored tracking token behind the button.
+func (s *Sender) SendJobsForGuild(
+	ctx context.Context, guildID int64, channelID string, jobs []job.Job,
 ) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, fmt.Errorf("send jobs: %w", err)
@@ -93,6 +106,11 @@ func (s *Sender) SendJobs(
 		return false, ErrMissingSender
 	}
 	first := jobs[0]
+
+	experimental, language, token, err := s.trackingContext(ctx, guildID, first)
+	if err != nil {
+		return false, err
+	}
 
 	var attachment *LogoAttachment
 	if ShouldPrefetchLogo(first.CompanyLogoURL) {
@@ -115,7 +133,7 @@ func (s *Sender) SendJobs(
 		if err := ctx.Err(); err != nil {
 			return false, fmt.Errorf("send jobs: %w", err)
 		}
-		message, err := s.prepareMessage(jobs, attachment, withFile)
+		message, err := s.prepareMessage(jobs, attachment, withFile, experimental, language, token)
 		if err != nil {
 			return false, err
 		}
@@ -144,22 +162,41 @@ func (s *Sender) SendJobs(
 	return false, nil
 }
 
-// SendJob delivers a single-job notification.
+// SendJob delivers a single non-experimental job notification.
 func (s *Sender) SendJob(
 	ctx context.Context, channelID string, record job.Job,
 ) (bool, error) {
 	return s.SendJobs(ctx, channelID, []job.Job{record})
 }
 
+// SendJobForGuild delivers a single-job notification for one guild.
+func (s *Sender) SendJobForGuild(
+	ctx context.Context, guildID int64, channelID string, record job.Job,
+) (bool, error) {
+	return s.SendJobsForGuild(ctx, guildID, channelID, []job.Job{record})
+}
+
 func (s *Sender) prepareMessage(
-	jobs []job.Job, attachment *LogoAttachment, withFile bool,
+	jobs []job.Job,
+	attachment *LogoAttachment,
+	withFile, experimental bool,
+	language, token string,
 ) (*discordgo.MessageSend, error) {
-	embed, err := BuildJobsEmbed(jobs, s.now())
+	build := BuildJobsEmbed
+	if experimental {
+		build = BuildExperimentalJobsEmbed
+	}
+	embed, err := build(jobs, s.now())
 	if err != nil {
 		return nil, fmt.Errorf("prepare job message: %w", err)
 	}
 	message := &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{embed},
+	}
+	if experimental {
+		message.Components = []discordgo.MessageComponent{
+			trackingButton(language, token, jobs[0].URL),
+		}
 	}
 	if withFile && attachment != nil {
 		filename := attachment.Filename()

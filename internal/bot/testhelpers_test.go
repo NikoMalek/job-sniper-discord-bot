@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"testing"
 
@@ -40,6 +41,7 @@ type fakeStore struct {
 	countErr          error
 	hasSetupErr       error
 	markSetupErr      error
+	experimental      *fakeExperimentalStore
 }
 
 func (s *fakeStore) HasSetupMessage(_ context.Context, guildID int64) (bool, error) {
@@ -259,6 +261,295 @@ func (s *fakeStore) GetGuildConfig(context.Context, int64) (store.GuildMonitorCo
 
 func (s *fakeStore) CountNotified(context.Context, int64) (int64, error) {
 	return s.notified, s.countErr
+}
+
+func (s *fakeStore) experimentalStore() *fakeExperimentalStore {
+	if s.experimental == nil {
+		s.experimental = &fakeExperimentalStore{}
+	}
+	return s.experimental
+}
+
+func (s *fakeStore) IsExperimentalEnabled(ctx context.Context, guildID int64) (bool, error) {
+	return s.experimentalStore().IsExperimentalEnabled(ctx, guildID)
+}
+
+func (s *fakeStore) SetExperimentalEnabled(ctx context.Context, guildID int64, enabled bool) error {
+	return s.experimentalStore().SetExperimentalEnabled(ctx, guildID, enabled)
+}
+
+func (s *fakeStore) GetExperimentalEnabledGuildIDs(ctx context.Context) ([]int64, error) {
+	return s.experimentalStore().GetExperimentalEnabledGuildIDs(ctx)
+}
+
+func (s *fakeStore) GetTrackedJob(ctx context.Context, token string) (*store.TrackedJob, error) {
+	return s.experimentalStore().GetTrackedJob(ctx, token)
+}
+
+func (s *fakeStore) RecordJobClick(
+	ctx context.Context, guildID, userID int64,
+	jobURL, jobTitle, company, source string,
+) (int64, error) {
+	return s.experimentalStore().RecordJobClick(ctx, guildID, userID, jobURL, jobTitle, company, source)
+}
+
+func (s *fakeStore) GetJobInteraction(ctx context.Context, recordID int64) (*store.JobInteraction, error) {
+	return s.experimentalStore().GetJobInteraction(ctx, recordID)
+}
+
+func (s *fakeStore) UpdateApplicationStatus(
+	ctx context.Context, recordID int64, applied *bool, notes *string,
+) (bool, error) {
+	return s.experimentalStore().UpdateApplicationStatus(ctx, recordID, applied, notes)
+}
+
+func (s *fakeStore) GetGuildSnipersRanking(
+	ctx context.Context, guildID int64, limit int,
+) ([]store.SniperRanking, error) {
+	return s.experimentalStore().GetGuildSnipersRanking(ctx, guildID, limit)
+}
+
+func (s *fakeStore) GetGuildSnipersTotals(ctx context.Context, guildID int64) (int64, int64, error) {
+	return s.experimentalStore().GetGuildSnipersTotals(ctx, guildID)
+}
+
+func (s *fakeStore) GetUserApplicationSummary(
+	ctx context.Context, guildID, userID int64,
+) (store.ApplicationSummary, error) {
+	return s.experimentalStore().GetUserApplicationSummary(ctx, guildID, userID)
+}
+
+func (s *fakeStore) GetUserApplications(
+	ctx context.Context, guildID, userID int64, limit, offset int,
+) ([]store.ApplicationRecord, error) {
+	return s.experimentalStore().GetUserApplications(ctx, guildID, userID, limit, offset)
+}
+
+func (s *fakeStore) GetDebugReportCount(
+	ctx context.Context, guildID int64, source *string,
+) (int64, error) {
+	return s.experimentalStore().GetDebugReportCount(ctx, guildID, source)
+}
+
+func (s *fakeStore) GetDebugReports(
+	ctx context.Context, guildID int64, source *string, limit, offset int,
+) ([]store.DebugReport, error) {
+	return s.experimentalStore().GetDebugReports(ctx, guildID, source, limit, offset)
+}
+
+type fakeExperimentalStore struct {
+	enabled        map[int64]bool
+	tracked        map[string]store.TrackedJob
+	interactions   map[int64]store.JobInteraction
+	nextRecordID   int64
+	clickedAtValue string
+	rankings       []store.SniperRanking
+	totalsApplied  int64
+	totalsViewed   int64
+	summaries      map[int64]store.ApplicationSummary
+	applications   map[int64][]store.ApplicationRecord
+	debugReports   []store.DebugReport
+	debugCount     int64
+	hasDebugCount  bool
+	err            error
+}
+
+func (s *fakeExperimentalStore) IsExperimentalEnabled(_ context.Context, guildID int64) (bool, error) {
+	if s.err != nil {
+		return false, s.err
+	}
+	return s.enabled[guildID], nil
+}
+
+func (s *fakeExperimentalStore) SetExperimentalEnabled(_ context.Context, guildID int64, enabled bool) error {
+	if s.err != nil {
+		return s.err
+	}
+	if s.enabled == nil {
+		s.enabled = make(map[int64]bool)
+	}
+	s.enabled[guildID] = enabled
+	return nil
+}
+
+func (s *fakeExperimentalStore) GetExperimentalEnabledGuildIDs(context.Context) ([]int64, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	ids := make([]int64, 0, len(s.enabled))
+	for id, enabled := range s.enabled {
+		if enabled {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids, nil
+}
+
+func (s *fakeExperimentalStore) GetTrackedJob(_ context.Context, token string) (*store.TrackedJob, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	tracked, ok := s.tracked[token]
+	if !ok {
+		return nil, nil
+	}
+	return &tracked, nil
+}
+
+func (s *fakeExperimentalStore) RecordJobClick(
+	_ context.Context, guildID, userID int64,
+	jobURL, jobTitle, company, source string,
+) (int64, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+	if s.interactions == nil {
+		s.interactions = make(map[int64]store.JobInteraction)
+	}
+	for id, row := range s.interactions {
+		if row.GuildID == guildID && row.UserID == userID && row.JobURL == jobURL {
+			row.JobTitle = jobTitle
+			row.Company = company
+			row.Source = source
+			row.ClickedAt = s.clickedAt()
+			s.interactions[id] = row
+			return id, nil
+		}
+	}
+	s.nextRecordID++
+	row := store.JobInteraction{
+		ID:        s.nextRecordID,
+		GuildID:   guildID,
+		UserID:    userID,
+		JobURL:    jobURL,
+		JobTitle:  jobTitle,
+		Company:   company,
+		Source:    source,
+		ClickedAt: s.clickedAt(),
+	}
+	s.interactions[row.ID] = row
+	return row.ID, nil
+}
+
+func (s *fakeExperimentalStore) GetJobInteraction(
+	_ context.Context, recordID int64,
+) (*store.JobInteraction, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	row, ok := s.interactions[recordID]
+	if !ok {
+		return nil, nil
+	}
+	return &row, nil
+}
+
+func (s *fakeExperimentalStore) UpdateApplicationStatus(
+	_ context.Context, recordID int64, applied *bool, notes *string,
+) (bool, error) {
+	if s.err != nil {
+		return false, s.err
+	}
+	row, ok := s.interactions[recordID]
+	if !ok {
+		return false, nil
+	}
+	row.Applied = applied
+	row.Notes = notes
+	s.interactions[recordID] = row
+	return true, nil
+}
+
+func (s *fakeExperimentalStore) GetGuildSnipersRanking(
+	_ context.Context, guildID int64, limit int,
+) ([]store.SniperRanking, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if guildID == 0 || limit < 1 {
+		return nil, nil
+	}
+	return append([]store.SniperRanking(nil), s.rankings...), nil
+}
+
+func (s *fakeExperimentalStore) GetGuildSnipersTotals(
+	_ context.Context, _ int64,
+) (int64, int64, error) {
+	return s.totalsApplied, s.totalsViewed, s.err
+}
+
+func (s *fakeExperimentalStore) GetUserApplicationSummary(
+	_ context.Context, _, userID int64,
+) (store.ApplicationSummary, error) {
+	if s.err != nil {
+		return store.ApplicationSummary{}, s.err
+	}
+	return s.summaries[userID], nil
+}
+
+func (s *fakeExperimentalStore) GetUserApplications(
+	_ context.Context, _, userID int64, limit, offset int,
+) ([]store.ApplicationRecord, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	rows := s.applications[userID]
+	if offset >= len(rows) {
+		return nil, nil
+	}
+	end := offset + limit
+	if end > len(rows) {
+		end = len(rows)
+	}
+	return append([]store.ApplicationRecord(nil), rows[offset:end]...), nil
+}
+
+func (s *fakeExperimentalStore) GetDebugReportCount(
+	_ context.Context, _ int64, source *string,
+) (int64, error) {
+	if s.err != nil {
+		return 0, s.err
+	}
+	if s.hasDebugCount {
+		return s.debugCount, nil
+	}
+	return int64(len(s.filteredDebugReports(source))), nil
+}
+
+func (s *fakeExperimentalStore) GetDebugReports(
+	_ context.Context, _ int64, source *string, limit, offset int,
+) ([]store.DebugReport, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	rows := s.filteredDebugReports(source)
+	if offset >= len(rows) {
+		return nil, nil
+	}
+	end := offset + limit
+	if end > len(rows) {
+		end = len(rows)
+	}
+	return append([]store.DebugReport(nil), rows[offset:end]...), nil
+}
+
+func (s *fakeExperimentalStore) clickedAt() string {
+	if s.clickedAtValue == "" {
+		return "2026-01-02T03:04:05Z"
+	}
+	return s.clickedAtValue
+}
+
+func (s *fakeExperimentalStore) filteredDebugReports(source *string) []store.DebugReport {
+	rows := make([]store.DebugReport, 0, len(s.debugReports))
+	for _, row := range s.debugReports {
+		if source != nil && *source != "" && !strings.EqualFold(row.Source, *source) {
+			continue
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 type fakeRegistry struct {

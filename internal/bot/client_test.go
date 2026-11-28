@@ -40,12 +40,22 @@ func (r *fakeResolver) ApplicationID(context.Context) (string, error) {
 	return r.id, r.err
 }
 
+type fakeMessageEdit struct {
+	channelID  string
+	messageID  string
+	components []discordgo.MessageComponent
+}
+
 type fakeInteractionSender struct {
 	err error
 
-	mu        sync.Mutex
-	responses []*discordgo.InteractionResponse
-	followups []string
+	mu           sync.Mutex
+	responses    []*discordgo.InteractionResponse
+	followups    []string
+	edits        []*discordgo.WebhookEdit
+	messageEdits []fakeMessageEdit
+	originalID   string
+	originals    int
 }
 
 func (s *fakeInteractionSender) Respond(
@@ -66,10 +76,59 @@ func (s *fakeInteractionSender) Followup(_ context.Context, _ *discordgo.Interac
 	return s.err
 }
 
+func (s *fakeInteractionSender) EditOriginal(
+	_ context.Context,
+	_ *discordgo.Interaction,
+	edit *discordgo.WebhookEdit,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.edits = append(s.edits, edit)
+	return s.err
+}
+
+func (s *fakeInteractionSender) EditMessage(
+	_ context.Context, channelID, messageID string, components []discordgo.MessageComponent,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messageEdits = append(s.messageEdits, fakeMessageEdit{
+		channelID: channelID, messageID: messageID, components: components,
+	})
+	return s.err
+}
+
+func (s *fakeInteractionSender) OriginalResponse(
+	_ context.Context, _ *discordgo.Interaction,
+) (*discordgo.Message, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.originals++
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &discordgo.Message{ID: s.originalID}, nil
+}
+
 func (s *fakeInteractionSender) snapshot() ([]*discordgo.InteractionResponse, []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]*discordgo.InteractionResponse(nil), s.responses...), append([]string(nil), s.followups...)
+}
+
+func (s *fakeInteractionSender) snapshotExperimental() (
+	[]*discordgo.InteractionResponse, []*discordgo.WebhookEdit, int,
+) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*discordgo.InteractionResponse(nil), s.responses...),
+		append([]*discordgo.WebhookEdit(nil), s.edits...), s.originals
+}
+
+func (s *fakeInteractionSender) messageEditSnapshot() []fakeMessageEdit {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]fakeMessageEdit(nil), s.messageEdits...)
 }
 
 func newTestClient(t *testing.T) (*Client, *fakeStore, *fakeRegistrar, *fakeResolver, *fakeInteractionSender) {
@@ -168,7 +227,7 @@ func TestRegisterCommandsUsesResolvedAppIDAndGlobalScope(t *testing.T) {
 	if resolver.id != "app-1" || registrar.appID != "app-1" || registrar.guildID != "" {
 		t.Fatalf("registrar call = %q, %q (resolver %q)", registrar.appID, registrar.guildID, resolver.id)
 	}
-	if got, want := len(registrar.commands), 21; got != want {
+	if got, want := len(registrar.commands), 22; got != want {
 		t.Fatalf("registered %d commands, want %d", got, want)
 	}
 	if client.applicationID != "app-1" {
@@ -324,6 +383,13 @@ func TestCommandResponseCarriesEphemeralEmbed(t *testing.T) {
 	}
 }
 
+func TestDeferredMessageUpdateResponse(t *testing.T) {
+	response := deferredMessageUpdateResponse()
+	if response.Type != discordgo.InteractionResponseDeferredMessageUpdate {
+		t.Fatalf("response type = %v", response.Type)
+	}
+}
+
 func TestNewSessionUsesOnlyGuildsIntent(t *testing.T) {
 	session, err := newSession("test-token")
 	if err != nil {
@@ -384,6 +450,7 @@ func TestDispatchUnknownCommand(t *testing.T) {
 
 func TestStoreInterfaceSatisfaction(t *testing.T) {
 	var _ Store = (*fakeStore)(nil)
+	var _ ExperimentalStore = (*fakeStore)(nil)
 	var _ PortalRegistry = (*fakeRegistry)(nil)
 	var _ OnboardingGateway = (*fakeOnboardingGateway)(nil)
 	var _ CommandRegistrar = (*fakeRegistrar)(nil)
@@ -391,5 +458,117 @@ func TestStoreInterfaceSatisfaction(t *testing.T) {
 	var _ InteractionSender = (*fakeInteractionSender)(nil)
 	if store.MaxMaxAgeHours <= store.MinMaxAgeHours {
 		t.Fatal("invalid max-age bounds in store package")
+	}
+}
+
+func TestSyncExperimentalCommandsUsesGuildScope(t *testing.T) {
+	client, _, registrar, _, _ := newTestClient(t)
+	ctx := context.Background()
+
+	if err := client.SyncExperimentalCommands(ctx, 10, true); err != nil {
+		t.Fatalf("SyncExperimentalCommands(enabled) error = %v", err)
+	}
+	if registrar.appID != "app-1" || registrar.guildID != "10" {
+		t.Fatalf("registrar call = %q, %q", registrar.appID, registrar.guildID)
+	}
+	names := make([]string, 0, len(registrar.commands))
+	for _, command := range registrar.commands {
+		names = append(names, command.Name)
+	}
+	want := []string{"snipers", "applications", "debug"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("commands = %v, want %v", names, want)
+	}
+
+	if err := client.SyncExperimentalCommands(ctx, 10, false); err != nil {
+		t.Fatalf("SyncExperimentalCommands(disabled) error = %v", err)
+	}
+	if len(registrar.commands) != 0 {
+		t.Fatalf("disabled commands = %#v, want none", registrar.commands)
+	}
+}
+
+func TestSyncEnabledExperimentalGuildsRunsOnce(t *testing.T) {
+	client, st, registrar, _, _ := newTestClient(t)
+	client.experimentalStore = st
+	_ = st.SetExperimentalEnabled(context.Background(), 10, true)
+	client.syncEnabledExperimentalGuilds(context.Background())
+	if registrar.calls != 1 || registrar.guildID != "10" || len(registrar.commands) != 3 {
+		t.Fatalf("registrar state = %d calls, guild %q, %d commands", registrar.calls, registrar.guildID, len(registrar.commands))
+	}
+	client.syncEnabledExperimentalGuilds(context.Background())
+	if registrar.calls != 1 {
+		t.Fatalf("registrar calls = %d, want 1", registrar.calls)
+	}
+}
+
+func TestOnInteractionCreateRoutesExperimentalInteractions(t *testing.T) {
+	client, st, _, _, sender := newTestClient(t)
+	created, err := NewExperimental(ExperimentalOptions{
+		Store:    st,
+		Registry: client.registry,
+		Messages: sender,
+	})
+	if err != nil {
+		t.Fatalf("NewExperimental() error = %v", err)
+	}
+	client.experimental = created
+
+	command := expCommandInteraction(10, 7, "experimental")
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: command})
+	responses, _, _ := sender.snapshotExperimental()
+	if len(responses) != 1 || len(responses[0].Data.Embeds) != 1 ||
+		responses[0].Data.Embeds[0].Title != "🧪 Zona Experimental" {
+		t.Fatalf("experimental responses = %#v", responses)
+	}
+
+	autocomplete := expCommandInteraction(10, 7, "experimental")
+	expSetCommandOptions(autocomplete, []*discordgo.ApplicationCommandInteractionDataOption{
+		{Name: "accion", Value: "", Focused: true},
+	})
+	autocomplete.Type = discordgo.InteractionApplicationCommandAutocomplete
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: autocomplete})
+	responses, _, _ = sender.snapshotExperimental()
+	if len(responses) != 2 || responses[1].Type != discordgo.InteractionApplicationCommandAutocompleteResult {
+		t.Fatalf("autocomplete responses = %#v", responses)
+	}
+	want := []*discordgo.ApplicationCommandOptionChoice{{Name: "Activar", Value: "activar"}}
+	if !reflect.DeepEqual(responses[1].Data.Choices, want) {
+		t.Fatalf("choices = %#v, want %#v", responses[1].Data.Choices, want)
+	}
+
+	repository := st.experimentalStore()
+	repository.enabled = map[int64]bool{10: true}
+	repository.tracked = map[string]store.TrackedJob{
+		"token-1": {
+			Token: "token-1", GuildID: 10, JobID: "job-1", Source: "Test",
+			JobURL: "https://example.test/job", JobTitle: "Go Developer", Company: "Acme",
+		},
+	}
+	component := expComponentInteraction(10, 7, "message-1", jobTrackPrefix+"token-1")
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: component})
+	responses, _, _ = sender.snapshotExperimental()
+	if len(responses) != 3 || responses[2].Type != discordgo.InteractionResponseModal ||
+		responses[2].Data.CustomID == "" {
+		t.Fatalf("component responses = %#v", responses)
+	}
+
+	modalCustomID := responses[2].Data.CustomID
+	modal := expModalInteraction(10, 7, modalCustomID, "yes", "Buena oferta")
+	client.onInteractionCreate(nil, &discordgo.InteractionCreate{Interaction: modal})
+	responses, edits, originals := sender.snapshotExperimental()
+	if len(responses) != 4 || len(edits) != 0 || originals != 0 {
+		t.Fatalf("modal sender state = %d responses, %d edits, %d originals",
+			len(responses), len(edits), originals)
+	}
+	if responses[3].Type != discordgo.InteractionResponseDeferredMessageUpdate {
+		t.Fatalf("modal ack type = %v", responses[3].Type)
+	}
+	interaction, err := repository.GetJobInteraction(context.Background(), 1)
+	if err != nil || interaction == nil || interaction.Applied == nil || !*interaction.Applied {
+		t.Fatalf("job interaction = %#v, error = %v", interaction, err)
+	}
+	if interaction.Notes == nil || *interaction.Notes != "Buena oferta" {
+		t.Fatalf("notes = %v, want %q", interaction.Notes, "Buena oferta")
 	}
 }

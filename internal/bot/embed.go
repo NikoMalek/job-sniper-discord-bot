@@ -17,6 +17,7 @@ type Embed struct {
 	Description string
 	Color       int
 	Fields      []EmbedField
+	Footer      string
 }
 
 // BuildSetupEmbed returns the one-time guide shown when the bot joins a guild.

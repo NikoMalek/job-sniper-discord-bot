@@ -65,12 +65,13 @@ func run(ctx context.Context) (err error) {
 	registry := scrapers.DefaultRegistry()
 
 	client, err := bot.NewClient(bot.ClientOptions{
-		Token:    settings.DiscordBotToken,
-		Settings: settings,
-		Store:    database,
-		Registry: registry,
-		Catalog:  catalog,
-		Matcher:  matcher,
+		Token:             settings.DiscordBotToken,
+		Settings:          settings,
+		Store:             database,
+		Registry:          registry,
+		Catalog:           catalog,
+		Matcher:           matcher,
+		ExperimentalStore: database,
 	})
 	if err != nil {
 		return fmt.Errorf("create Discord client: %w", err)
@@ -78,7 +79,10 @@ func run(ctx context.Context) (err error) {
 
 	session := client.Session()
 	messageSender := notifier.NewDiscordMessageSender(session)
-	jobSender := notifier.NewSender(notifier.SenderOptions{Messages: messageSender})
+	jobSender := notifier.NewSender(notifier.SenderOptions{
+		Messages: messageSender,
+		Tracking: database,
+	})
 	mon, err := monitor.New(ctx, monitor.Options{
 		Store:    database,
 		Portals:  monitor.NewRegistryPortals(registry),

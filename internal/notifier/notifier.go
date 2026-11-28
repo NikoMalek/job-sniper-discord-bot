@@ -52,6 +52,16 @@ var ErrNoJobs = errors.New("At least one job is required to build an embed.")
 // group of the same job found on several portals. now is injected so relative
 // publication text is deterministic.
 func BuildJobsEmbed(jobs []job.Job, now time.Time) (*discordgo.MessageEmbed, error) {
+	return buildJobsEmbed(jobs, now, false)
+}
+
+// BuildExperimentalJobsEmbed builds the clean embed used in experimental
+// guilds: the title is not linked and the description uses the short suffix.
+func BuildExperimentalJobsEmbed(jobs []job.Job, now time.Time) (*discordgo.MessageEmbed, error) {
+	return buildJobsEmbed(jobs, now, true)
+}
+
+func buildJobsEmbed(jobs []job.Job, now time.Time, experimental bool) (*discordgo.MessageEmbed, error) {
 	if len(jobs) == 0 {
 		return nil, ErrNoJobs
 	}
@@ -63,8 +73,10 @@ func BuildJobsEmbed(jobs []job.Job, now time.Time) (*discordgo.MessageEmbed, err
 	embed := &discordgo.MessageEmbed{
 		Type:  discordgo.EmbedTypeRich,
 		Title: display(primary.Title, titleFallback, titleLimit),
-		URL:   primary.URL,
 		Color: color,
+	}
+	if !experimental {
+		embed.URL = primary.URL
 	}
 	if len(sources) == 1 {
 		embed.Author = &discordgo.MessageEmbedAuthor{
@@ -78,7 +90,7 @@ func BuildJobsEmbed(jobs []job.Job, now time.Time) (*discordgo.MessageEmbed, err
 	}
 
 	descriptionParts := make([]string, 0, 4)
-	if short := shortDescription(primary); short != "" {
+	if short := shortDescriptionFor(primary, experimental); short != "" {
 		descriptionParts = append(descriptionParts, short)
 	}
 	descriptionParts = append(descriptionParts,
@@ -202,11 +214,18 @@ func sliceRunes(value string, index int) string {
 }
 
 func shortDescription(record job.Job) string {
+	return shortDescriptionFor(record, false)
+}
+
+func shortDescriptionFor(record job.Job, experimental bool) string {
 	description := display(record.Description, "", shortDescriptionLimit)
 	if description == "" {
 		return ""
 	}
-	suffix := "… [Ver más...](" + record.URL + ")"
+	suffix := "…"
+	if !experimental {
+		suffix = "… [Ver más...](" + record.URL + ")"
+	}
 	available := embedDescriptionLimit - utf8.RuneCountInString(suffix)
 	if utf8.RuneCountInString(description) > available {
 		description = strings.TrimRight(

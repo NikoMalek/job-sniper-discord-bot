@@ -26,10 +26,18 @@ type ApplicationResolver interface {
 	ApplicationID(ctx context.Context) (string, error)
 }
 
-// InteractionSender sends initial interaction responses and followups.
+// InteractionSender sends initial interaction responses, followups, edits and
+// acknowledgements. Implementations never create real network calls in tests;
+// the Discord adapter is supplied by main.
 type InteractionSender interface {
 	Respond(ctx context.Context, interaction *discordgo.Interaction, response *discordgo.InteractionResponse) error
 	Followup(ctx context.Context, interaction *discordgo.Interaction, content string) error
+	EditOriginal(ctx context.Context, interaction *discordgo.Interaction, edit *discordgo.WebhookEdit) error
+	EditMessage(
+		ctx context.Context, channelID, messageID string,
+		components []discordgo.MessageComponent,
+	) error
+	OriginalResponse(ctx context.Context, interaction *discordgo.Interaction) (*discordgo.Message, error)
 }
 
 // ClientOptions configures a Discord client.
@@ -47,26 +55,31 @@ type ClientOptions struct {
 	CommandRegistrar  CommandRegistrar
 	ApplicationLookup ApplicationResolver
 	InteractionSender InteractionSender
+	ExperimentalStore ExperimentalStore
+	Experimental      *Experimental
 }
 
 // Client owns the Discord session and dispatches guild events and commands.
 type Client struct {
-	session       *discordgo.Session
-	admin         *Admin
-	onboarding    *Onboarding
-	registry      PortalRegistry
-	applicationID string
-	registrar     CommandRegistrar
-	appLookup     ApplicationResolver
-	sender        InteractionSender
+	session           *discordgo.Session
+	admin             *Admin
+	onboarding        *Onboarding
+	registry          PortalRegistry
+	applicationID     string
+	registrar         CommandRegistrar
+	appLookup         ApplicationResolver
+	sender            InteractionSender
+	experimental      *Experimental
+	experimentalStore ExperimentalStore
 
-	mu        sync.Mutex
-	ctx       context.Context
-	responded map[string]bool
-	closeOnce sync.Once
-	closeErr  error
-	readyOnce sync.Once
-	ready     chan struct{}
+	mu                 sync.Mutex
+	ctx                context.Context
+	responded          map[string]bool
+	experimentalSynced bool
+	closeOnce          sync.Once
+	closeErr           error
+	readyOnce          sync.Once
+	ready              chan struct{}
 }
 
 // NewClient builds a client and registers its event handlers.
@@ -122,18 +135,43 @@ func NewClient(options ClientOptions) (*Client, error) {
 	if sender == nil {
 		sender = &discordInteractionSender{session: session}
 	}
+	experimentalStore := options.ExperimentalStore
+	if experimentalStore == nil {
+		if typed, ok := options.Store.(ExperimentalStore); ok {
+			experimentalStore = typed
+		}
+	}
 	client := &Client{
-		session:       session,
-		admin:         admin,
-		onboarding:    onboarding,
-		registry:      registry,
-		applicationID: options.AppID,
-		registrar:     registrar,
-		appLookup:     appLookup,
-		sender:        sender,
-		ctx:           context.Background(),
-		responded:     make(map[string]bool),
-		ready:         make(chan struct{}),
+		session:           session,
+		admin:             admin,
+		onboarding:        onboarding,
+		registry:          registry,
+		applicationID:     options.AppID,
+		registrar:         registrar,
+		appLookup:         appLookup,
+		sender:            sender,
+		experimentalStore: experimentalStore,
+		ctx:               context.Background(),
+		responded:         make(map[string]bool),
+		ready:             make(chan struct{}),
+	}
+	client.experimental = options.Experimental
+	if client.experimental == nil && experimentalStore != nil {
+		created, err := NewExperimental(ExperimentalOptions{
+			Store:    experimentalStore,
+			Registry: registry,
+			Messages: sender,
+			Sync: func(ctx context.Context, guildID int64, enabled bool) error {
+				return client.SyncExperimentalCommands(ctx, guildID, enabled)
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create experimental commands: %w", err)
+		}
+		client.experimental = created
+	}
+	if client.experimental != nil && client.experimental.messages == nil {
+		client.experimental.messages = sender
 	}
 	session.AddHandler(client.onReady)
 	session.AddHandler(client.onGuildCreate)
@@ -185,6 +223,7 @@ func (c *Client) Run(ctx context.Context) error {
 	if err := c.RegisterCommands(ctx); err != nil {
 		return fmt.Errorf("register commands: %w", err)
 	}
+	c.syncEnabledExperimentalGuilds(ctx)
 	if err := c.session.Open(); err != nil {
 		return fmt.Errorf("open Discord session: %w", err)
 	}
@@ -200,26 +239,88 @@ func (c *Client) Close() error {
 	return c.closeErr
 }
 
-// RegisterCommands overwrites the global command set with the admin commands.
+// RegisterCommands overwrites the global command set with the admin commands
+// and the always-available experimental status command.
 func (c *Client) RegisterCommands(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	appID := c.applicationID
-	if appID == "" {
-		resolved, err := c.appLookup.ApplicationID(ctx)
-		if err != nil {
-			return fmt.Errorf("resolve application id: %w", err)
-		}
-		appID = resolved
-		c.applicationID = resolved
+	appID, err := c.resolveApplicationID(ctx)
+	if err != nil {
+		return err
 	}
 	commands := AdminCommandDefinitions(PortalChoices(c.registry))
+	commands = append(commands, GlobalCommandDefinitions()...)
 	if err := c.registrar.RegisterCommands(ctx, appID, "", commands); err != nil {
 		return fmt.Errorf("bulk overwrite commands: %w", err)
 	}
 	slog.Info("Synchronized application commands", "count", len(commands))
 	return nil
+}
+
+func (c *Client) resolveApplicationID(ctx context.Context) (string, error) {
+	if c.applicationID != "" {
+		return c.applicationID, nil
+	}
+	resolved, err := c.appLookup.ApplicationID(ctx)
+	if err != nil {
+		return "", fmt.Errorf("resolve application id: %w", err)
+	}
+	c.applicationID = resolved
+	return resolved, nil
+}
+
+// SyncExperimentalCommands registers or removes the guild-only experimental
+// commands. An empty command set removes them from that guild.
+func (c *Client) SyncExperimentalCommands(ctx context.Context, guildID int64, enabled bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	appID, err := c.resolveApplicationID(ctx)
+	if err != nil {
+		return err
+	}
+	commands := []*discordgo.ApplicationCommand(nil)
+	if enabled {
+		commands = ExperimentalGuildCommandDefinitions()
+	}
+	if err := c.registrar.RegisterCommands(
+		ctx, appID, strconv.FormatInt(guildID, 10), commands,
+	); err != nil {
+		return fmt.Errorf("sync experimental commands: %w", err)
+	}
+	slog.Info(
+		"Synchronized experimental commands", "guild_id", guildID,
+		"enabled", enabled, "count", len(commands),
+	)
+	return nil
+}
+
+func (c *Client) syncEnabledExperimentalGuilds(ctx context.Context) {
+	c.mu.Lock()
+	if c.experimentalSynced {
+		c.mu.Unlock()
+		return
+	}
+	c.experimentalSynced = true
+	store := c.experimentalStore
+	c.mu.Unlock()
+	if store == nil {
+		return
+	}
+	guildIDs, err := store.GetExperimentalEnabledGuildIDs(ctx)
+	if err != nil {
+		slog.Warn("Could not read experimental guilds", "error", err)
+		return
+	}
+	for _, guildID := range guildIDs {
+		if err := c.SyncExperimentalCommands(ctx, guildID, true); err != nil {
+			slog.Error(
+				"Could not synchronize experimental commands",
+				"guild_id", guildID, "error", err,
+			)
+		}
+	}
 }
 
 func (c *Client) baseContext() context.Context {
@@ -258,6 +359,7 @@ func (c *Client) onReady(session *discordgo.Session, ready *discordgo.Ready) {
 		}
 	}
 	c.onboarding.OnReady(c.baseContext(), guilds)
+	c.syncEnabledExperimentalGuilds(c.baseContext())
 }
 
 func (c *Client) onGuildCreate(session *discordgo.Session, created *discordgo.GuildCreate) {
@@ -338,22 +440,107 @@ func (c *Client) onInteractionCreate(_ *discordgo.Session, event *discordgo.Inte
 	}
 	interaction := event.Interaction
 	ctx := c.baseContext()
-	if interaction.Type == discordgo.InteractionApplicationCommandAutocomplete {
+	switch interaction.Type {
+	case discordgo.InteractionApplicationCommandAutocomplete:
 		c.handleAutocomplete(ctx, interaction)
-		return
+	case discordgo.InteractionMessageComponent:
+		c.handleExperimentalInteraction(ctx, interaction, "component")
+	case discordgo.InteractionModalSubmit:
+		c.handleExperimentalInteraction(ctx, interaction, "modal")
+	case discordgo.InteractionApplicationCommand:
+		c.handleApplicationCommand(ctx, interaction)
 	}
-	if interaction.Type != discordgo.InteractionApplicationCommand {
+}
+
+func (c *Client) handleApplicationCommand(ctx context.Context, interaction *discordgo.Interaction) {
+	data := interaction.ApplicationCommandData()
+	if isExperimentalCommand(data.Name) {
+		guildID := parseSnowflake(interaction.GuildID)
+		if guildID == 0 || c.experimental == nil {
+			c.respond(ctx, interaction, c.admin.ErrorResponse(ErrPermissionDenied))
+			return
+		}
+		result, err := c.experimental.Command(ctx, interaction)
+		if err != nil {
+			result = c.experimental.ErrorResult(ctx, guildID, err)
+		}
+		c.applyExperimentalResult(ctx, interaction, result)
 		return
 	}
 	if parseSnowflake(interaction.GuildID) == 0 {
 		c.respond(ctx, interaction, c.admin.ErrorResponse(ErrPermissionDenied))
 		return
 	}
-	response, err := c.dispatch(ctx, parseSnowflake(interaction.GuildID), interaction.ApplicationCommandData())
+	response, err := c.dispatch(ctx, parseSnowflake(interaction.GuildID), data)
 	if err != nil {
 		response = c.admin.ErrorResponse(err)
 	}
 	c.respond(ctx, interaction, response)
+}
+
+func (c *Client) handleExperimentalInteraction(
+	ctx context.Context, interaction *discordgo.Interaction, kind string,
+) {
+	if c.experimental == nil {
+		return
+	}
+	var result *CommandResult
+	var err error
+	if kind == "component" {
+		result, err = c.experimental.HandleComponent(ctx, interaction)
+	} else {
+		result, err = c.experimental.HandleModalSubmit(ctx, interaction)
+	}
+	guildID := parseSnowflake(interaction.GuildID)
+	if err != nil {
+		result = c.experimental.ErrorResult(ctx, guildID, err)
+	}
+	c.applyExperimentalResult(ctx, interaction, result)
+}
+
+func (c *Client) applyExperimentalResult(
+	ctx context.Context, interaction *discordgo.Interaction, result *CommandResult,
+) {
+	if result == nil {
+		return
+	}
+	var err error
+	switch {
+	case result.Respond != nil:
+		err = c.sender.Respond(ctx, interaction, result.Respond)
+	case result.Edit != nil:
+		err = c.sender.EditOriginal(ctx, interaction, result.Edit)
+	case result.Defer:
+		err = c.sender.Respond(ctx, interaction, deferredMessageUpdateResponse())
+	}
+	if err != nil {
+		slog.Warn(
+			"Could not answer experimental interaction",
+			"interaction_id", interaction.ID, "error", err,
+		)
+	}
+	if result.Followup != "" {
+		if err := c.sender.Followup(ctx, interaction, result.Followup); err != nil {
+			slog.Warn(
+				"Could not send experimental followup",
+				"interaction_id", interaction.ID, "error", err,
+			)
+		}
+	}
+	if result.After != nil {
+		if err := result.After(ctx); err != nil {
+			slog.Warn(
+				"Experimental interaction follow-up failed",
+				"interaction_id", interaction.ID, "error", err,
+			)
+		}
+	}
+}
+
+func deferredMessageUpdateResponse() *discordgo.InteractionResponse {
+	return &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredMessageUpdate,
+	}
 }
 
 func (c *Client) handleAutocomplete(ctx context.Context, interaction *discordgo.Interaction) {
@@ -371,6 +558,10 @@ func (c *Client) handleAutocomplete(ctx context.Context, interaction *discordgo.
 		choices, err = c.admin.RemoveBlacklistKeywordAutocomplete(ctx, guildID, current)
 	case "remove-portal":
 		choices, err = c.admin.RemovePortalAutocomplete(ctx, guildID, current)
+	default:
+		if c.experimental != nil && isExperimentalCommand(data.Name) {
+			choices = c.experimental.Autocomplete(ctx, interaction)
+		}
 	}
 	if err != nil {
 		slog.Warn("Autocomplete failed", "command", data.Name, "option", name, "error", err)
@@ -551,12 +742,16 @@ func toDiscordEmbed(embed *Embed) *discordgo.MessageEmbed {
 			Inline: field.Inline,
 		})
 	}
-	return &discordgo.MessageEmbed{
+	result := &discordgo.MessageEmbed{
 		Title:       embed.Title,
 		Description: embed.Description,
 		Color:       embed.Color,
 		Fields:      fields,
 	}
+	if embed.Footer != "" {
+		result.Footer = &discordgo.MessageEmbedFooter{Text: embed.Footer}
+	}
+	return result
 }
 
 type discordCommandRegistrar struct {
@@ -626,6 +821,49 @@ func (s *discordInteractionSender) Followup(ctx context.Context, interaction *di
 		return fmt.Errorf("followup message: %w", err)
 	}
 	return nil
+}
+
+func (s *discordInteractionSender) EditOriginal(
+	ctx context.Context, interaction *discordgo.Interaction, edit *discordgo.WebhookEdit,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if _, err := s.session.InteractionResponseEdit(
+		interaction, edit, discordgo.WithContext(ctx),
+	); err != nil {
+		return fmt.Errorf("edit original response: %w", err)
+	}
+	return nil
+}
+
+func (s *discordInteractionSender) EditMessage(
+	ctx context.Context, channelID, messageID string, components []discordgo.MessageComponent,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	edit := discordgo.NewMessageEdit(channelID, messageID)
+	edit.Components = &components
+	if _, err := s.session.ChannelMessageEditComplex(edit, discordgo.WithContext(ctx)); err != nil {
+		return fmt.Errorf("edit message components: %w", err)
+	}
+	return nil
+}
+
+func (s *discordInteractionSender) OriginalResponse(
+	ctx context.Context, interaction *discordgo.Interaction,
+) (*discordgo.Message, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	message, err := s.session.InteractionResponse(
+		interaction, discordgo.WithContext(ctx),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get original response: %w", err)
+	}
+	return message, nil
 }
 
 type discordOnboardingGateway struct {

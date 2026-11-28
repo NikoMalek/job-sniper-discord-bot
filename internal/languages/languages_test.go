@@ -96,3 +96,44 @@ func TestSupportedLanguagesAndLabels(t *testing.T) {
 		t.Errorf("Label(klingon) = %q, want klingon", got)
 	}
 }
+
+func TestPreferredUILanguage(t *testing.T) {
+	tests := []struct {
+		name       string
+		configured []string
+		want       string
+	}{
+		{"canonical priority", []string{"german", "english"}, "english"},
+		{"alias normalization", []string{"FR", "de"}, "french"},
+		{"unsupported values", []string{"klingon"}, "spanish"},
+		{"empty", nil, "spanish"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := PreferredUILanguage(test.configured); got != test.want {
+				t.Fatalf("PreferredUILanguage(%v) = %q, want %q", test.configured, got, test.want)
+			}
+		})
+	}
+	wantOrder := []string{"spanish", "english", "portuguese", "french", "german"}
+	for index, language := range wantOrder {
+		if UILanguageOrder[index] != language {
+			t.Fatalf("UILanguageOrder[%d] = %q, want %q", index, UILanguageOrder[index], language)
+		}
+	}
+}
+
+func TestTrackingTextFormatsValuesAndFallsBack(t *testing.T) {
+	values := map[string]string{"title": "Role", "company": "Acme"}
+	got := TrackingText("applied_question", "english", values)
+	want := "Did you apply to **Role** at **Acme**?"
+	if got != want {
+		t.Fatalf("TrackingText(applied_question) = %q, want %q", got, want)
+	}
+	if got := TrackingText("applied_question", "klingon", values); got != "¿Postulaste a **Role** en **Acme**?" {
+		t.Fatalf("Spanish fallback = %q", got)
+	}
+	if got := TrackingText("missing_key", "english", nil); got != "" {
+		t.Fatalf("TrackingText(unknown) = %q, want empty", got)
+	}
+}
